@@ -489,7 +489,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 6 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 7 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -1078,7 +1078,10 @@ function pintaTop(top) {
     d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div><div class="mto num"></div>';
     d.querySelector('.bolita').style.background = colorCat(t.categoria);
     d.querySelector('.c').textContent = t.concepto;
-    d.querySelector('.m').textContent = t.categoria;
+    // El servidor junta los gastos que son la misma cosa; aquí solo se dice
+    // cuántas veces, para que se entienda de dónde sale la suma.
+    d.querySelector('.m').textContent = t.categoria +
+      (t.veces > 1 ? ' · ' + t.veces + ' veces' : '');
     d.querySelector('.mto').textContent = pesos(t.monto);
     l.appendChild(d);
   });
