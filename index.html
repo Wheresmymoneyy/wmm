@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where's my money?</title>
+<link rel="manifest" href="manifest.webmanifest">
+<script src="config.js"></script>
+<meta name="theme-color" content="#7CB140" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B211C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WMM?">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Registra tus gastos en tres toques y mira en qué se te va el dinero.">
+<link rel="apple-touch-icon" href="iconos/icono-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="iconos/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="iconos/icono-192.png">
+<style>
+  :root {
+    --ground:#F4F7F1; --surface:#FFFFFF; --surface-2:#EDF2E6; --ink:#1A2015;
+    --muted:#5F6B55; --line:#DDE4D3; --marca:#7CB140; --sobre-marca:#16200F;
+    --accent:#54782B; --accent-ink:#476823; --accent-soft:#EAF3DC;
+    --seg-track:#E4EBDA; --seg-on:#FFFFFF;
+    --warn:#8E5C0D; --warn-soft:#F7EDDA; --danger:#A83A2C;
+    --c-nec:#2a78d6; --c-oci:#1baf7a; --c-inn:#4a3aa7; --c-hor:#eb6834;
+    --c-in:#1baf7a; --c-out:#eb6834; --c-ref:#8a8a85; --bar-alta:#C07A10;
+    --r:14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#1B211C; --surface:#242B25; --surface-2:#2F382F; --ink:#E9EFE4;
+      --muted:#9BA795; --line:#39413A; --marca:#8FC250; --sobre-marca:#12180E;
+      --accent:#A1CC71; --accent-ink:#B5D98D; --accent-soft:#273219;
+      --seg-track:#1E2520; --seg-on:#3A443B;
+      --warn:#D6A44F; --warn-soft:#2E2718; --danger:#E28271;
+      --c-nec:#3987e5; --c-oci:#199e70; --c-inn:#9085e9; --c-hor:#d95926;
+      --c-in:#199e70; --c-out:#d95926; --c-ref:#8b978a; --bar-alta:#D6A44F;
+    }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:var(--ground); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    font-size:16px; line-height:1.45; -webkit-text-size-adjust:100%;
+    padding-top:env(safe-area-inset-top, 0px);
+  }
+  .num { font-family:ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric:tabular-nums; }
+
+  /* ---------- estructura ---------- */
+  #app { display:none; padding:0 16px 104px; max-width:640px; margin:0 auto; }
+  #app.listo { display:block; }
+  .pantalla { display:none; }
+  .pantalla.activa { display:block; }
+
+  header.top { padding:16px 0 10px; display:flex; align-items:center; gap:11px; }
+  header.top .tit { flex:1; min-width:0; }
+  .tile-chico {
+    width:34px; height:34px; flex:none; border-radius:10px; overflow:hidden;
+    background:#1F231D; display:grid; place-items:center;
+  }
+  .tile-chico img { width:100%; height:100%; display:block; object-fit:cover; }
+  header.top h1 { font-size:20px; font-weight:700; letter-spacing:-.02em; margin:0; }
+  header.top .fecha { font-size:13px; color:var(--muted); }
+  .btn-cfg { background:none; border:0; color:var(--muted); font-size:13px; padding:4px 0; cursor:pointer; }
+
+  nav.tabs {
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    display:flex; background:var(--surface); border-top:1px solid var(--line);
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  nav.tabs button {
+    flex:1; background:none; border:0; color:var(--muted); cursor:pointer;
+    font-size:11px; font-weight:600; letter-spacing:.02em; padding:6px 0 4px;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+  }
+  nav.tabs button.on { color:var(--accent); }
+  nav.tabs svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+  .banner { display:flex; gap:0; padding:14px 6px; }
+  .banner .col { flex:1; text-align:center; padding:0 6px; border-right:1px solid var(--line); }
+  .banner .col:last-child { border-right:0; }
+  .banner .et { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+  .banner .va { font-size:17px; font-weight:700; margin-top:3px; letter-spacing:-.02em; }
+  .banner .col:nth-child(1) .va { color:var(--c-in); }
+  .banner .col:nth-child(2) .va { color:var(--c-out); }
+
+  .tarjeta { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-bottom:12px; }
+  .titulo-sec { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+
+  /* ---------- registrar ---------- */
+  .segmento { display:flex; background:var(--seg-track); border-radius:11px; padding:3px; margin-bottom:16px; }
+  .segmento button {
+    flex:1; border:0; background:none; color:var(--muted); font-size:15px; font-weight:600;
+    padding:9px 0; border-radius:9px; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .segmento button.on { background:var(--seg-on); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.16); }
+
+  .campo { margin-bottom:16px; }
+  .campo label { display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px; letter-spacing:.02em; }
+  .campo input[type=text], .campo input[type=number], .campo input[type=password] {
+    width:100%; background:var(--surface); color:var(--ink);
+    border:1px solid var(--line); border-radius:11px; padding:13px 14px;
+    font-size:17px; font-family:inherit;
+  }
+  .campo input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
+  #monto { font-size:30px; font-weight:700; padding:12px 14px; font-family:ui-monospace,"SF Mono",Menlo,monospace; font-variant-numeric:tabular-nums; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip {
+    border:1px solid var(--line); background:var(--surface); color:var(--ink);
+    border-radius:999px; padding:9px 15px; font-size:14.5px; font-family:inherit; cursor:pointer;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .chip .punto { width:9px; height:9px; border-radius:50%; background:var(--muted); }
+  .chip.on { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+
+  .guardar {
+    width:100%; border:0; border-radius:13px; background:var(--marca); color:var(--sobre-marca);
+    font-size:17px; font-weight:700; padding:16px; cursor:pointer; font-family:inherit;
+  }
+  .guardar:disabled { opacity:.5; }
+
+  .aviso { border-radius:11px; padding:12px 14px; margin-bottom:12px; font-size:14.5px; white-space:pre-line; }
+  .aviso.ok { background:var(--accent-soft); color:var(--accent-ink); }
+  .aviso.mal { background:var(--warn-soft); color:var(--warn); }
+
+  /* ---------- números del mes ---------- */
+  .hero .grande { font-size:38px; font-weight:700; letter-spacing:-.03em; line-height:1.05; }
+  .hero .de { font-size:14px; color:var(--muted); margin-top:2px; }
+  .barra { height:9px; border-radius:5px; background:var(--surface-2); overflow:hidden; margin:14px 0 10px; }
+  .barra span { display:block; height:100%; border-radius:5px; background:var(--marca); transition:width .4s ease; }
+  .barra.alta span { background:var(--bar-alta); }
+  .barra.pasado span { background:var(--danger); }
+  .dosdatos { display:flex; gap:10px; }
+  .dosdatos > div { flex:1; background:var(--surface-2); border-radius:11px; padding:11px 13px; }
+  .dosdatos .et { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .dosdatos .va { font-size:18px; font-weight:700; margin-top:2px; }
+
+  .leyenda { display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+  .leyenda .fila { display:flex; align-items:center; gap:9px; font-size:14.5px; }
+  .leyenda .sw { width:11px; height:11px; border-radius:3px; flex:none; }
+  .leyenda .nom { flex:1; }
+  .leyenda .val { color:var(--muted); }
+
+  .lista { display:flex; flex-direction:column; }
+  .lista .item { display:flex; align-items:center; gap:11px; padding:11px 0; border-bottom:1px solid var(--line); }
+  .lista .item:last-child { border-bottom:0; }
+  .lista .bolita { width:9px; height:9px; border-radius:50%; flex:none; }
+  .lista .txt { flex:1; min-width:0; }
+  .lista .txt .c { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lista .txt .m { font-size:12.5px; color:var(--muted); }
+  .lista .mto { font-size:15px; font-weight:700; }
+  .lista .mto.ing { color:var(--c-in); }
+  .lista .borrar { background:none; border:0; color:var(--muted); font-size:19px; padding:2px 4px; cursor:pointer; line-height:1; }
+
+  .vacio { color:var(--muted); font-size:14.5px; padding:6px 0; }
+
+  svg.g { display:block; width:100%; height:auto; overflow:visible; }
+  svg.g text { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-variant-numeric:tabular-nums; }
+
+  /* ---------- ajustes ---------- */
+  #puerta { max-width:420px; margin:0 auto; padding:0 20px 48px; min-height:100%; }
+  .marca { text-align:center; padding:52px 0 34px; }
+  .marca .tile {
+    width:94px; height:94px; margin:0 auto 20px; border-radius:24px; overflow:hidden;
+    background:#1F231D; display:grid; place-items:center;
+    box-shadow:0 14px 34px -14px rgba(124,177,64,.75);
+  }
+  .marca .tile img { width:100%; height:100%; display:block; object-fit:cover; }
+  #puerta h1 { font-size:31px; font-weight:700; letter-spacing:-.025em; margin:0 0 6px; }
+  .marca .lema { color:var(--muted); font-size:15px; margin:0; }
+  #puertaSub { color:var(--muted); margin:0 0 20px; font-size:14px; text-align:center; }
+  .letra-chica { margin:26px 0 0; font-size:12.5px; color:var(--muted); line-height:1.55; text-align:center; }
+  dialog { border:0; border-radius:var(--r); padding:0; background:var(--surface); color:var(--ink); max-width:400px; width:calc(100% - 32px); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  dialog .cuerpo { padding:18px; }
+  dialog h2 { font-size:17px; margin:0 0 14px; }
+  .fila-btn { display:flex; gap:9px; margin-top:6px; }
+  .fila-btn button { flex:1; border-radius:11px; padding:12px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); }
+  .fila-btn button.pri { background:var(--marca); color:var(--sobre-marca); border-color:var(--marca); }
+
+  details.grupo { border-bottom:1px solid var(--line); padding:4px 0; }
+  details.grupo:last-of-type { border-bottom:0; }
+  details.grupo summary { cursor:pointer; font-size:15px; font-weight:600; padding:11px 0; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+  details.grupo summary::-webkit-details-marker { display:none; }
+  details.grupo summary::after { content:"›"; color:var(--muted); font-size:19px; transition:transform .15s; }
+  details.grupo[open] summary::after { transform:rotate(90deg); }
+  .pista { margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .pista i { font-style:normal; background:var(--surface-2); border-radius:4px; padding:1px 5px; color:var(--ink); }
+  button.chico { width:100%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:11px; padding:11px; font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; margin-bottom:12px; }
+  button.chico.pri { background:var(--marca); color:var(--sobre-marca); border-color:var(--marca); }
+
+  #jalon {
+    position:fixed; top:calc(env(safe-area-inset-top, 0px) + 6px); left:50%; margin-left:-19px;
+    width:38px; height:38px; border-radius:50%; background:var(--surface);
+    border:1px solid var(--line); color:var(--accent);
+    display:grid; place-items:center; opacity:0; pointer-events:none; z-index:30;
+    transform:translateY(-52px); transition:opacity .15s;
+  }
+  #jalon svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  #jalon.suelta { background:var(--marca); border-color:var(--marca); color:var(--sobre-marca); }
+  #jalon.girando svg { animation:vuelta .9s linear infinite; }
+  @keyframes vuelta { to { transform:rotate(360deg); } }
+
+  .cargando { color:var(--muted); font-size:14.5px; text-align:center; padding:40px 0; }
+
+  .dato-copiar { display:flex; align-items:center; gap:10px; background:var(--surface-2); border-radius:11px; padding:11px 13px; }
+  .dato-copiar code { flex:1; min-width:0; font-size:16px; font-weight:600; word-break:break-all; font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+  button.mini { flex:none; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:9px; padding:7px 12px; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button.mini.hecho { background:var(--marca); border-color:var(--marca); color:var(--sobre-marca); }
+
+  .atajo { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .atajo:last-child { border-bottom:0; }
+  .atajo .ico { width:34px; height:34px; border-radius:9px; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-size:17px; flex:none; }
+  .atajo .txt { flex:1; min-width:0; }
+  .atajo .txt b { display:block; font-size:15px; }
+  .atajo .txt span { font-size:12.5px; color:var(--muted); }
+  .atajo.primero { background:var(--accent-soft); border-radius:11px; padding:12px; margin-bottom:6px; border-bottom:0; }
+  .atajo.primero .ico { background:var(--marca); color:var(--sobre-marca); }
+  ol.mini-pasos { margin:0 0 18px; padding-left:22px; color:var(--muted); font-size:14px; line-height:1.5; }
+  ol.mini-pasos li { margin-bottom:9px; padding-left:2px; }
+  ol.mini-pasos li::marker { color:var(--accent); font-weight:700; }
+  ol.mini-pasos b { color:var(--ink); }
+  ol.mini-pasos i { font-style:normal; background:var(--surface-2); border-radius:4px; padding:1px 5px; color:var(--ink); }
+  details#cajaOpcionales summary { cursor:pointer; font-size:14px; font-weight:600; color:var(--accent); padding:10px 0; list-style:none; }
+  details#cajaOpcionales summary::-webkit-details-marker { display:none; }
+  details#cajaOpcionales summary::before { content:"＋ "; font-weight:400; }
+  details#cajaOpcionales[open] summary::before { content:"− "; }
+  .nota-op { margin:0 0 4px; font-size:13px; color:var(--muted); line-height:1.5; }
+  .nota-op b { color:var(--ink); }
+  .atajo a { flex:none; text-decoration:none; border-radius:9px; padding:8px 14px; font-size:13.5px; font-weight:700; background:var(--marca); color:var(--sobre-marca); }
+
+  ol.pasos { list-style:none; counter-reset:p; margin:0; padding:0; }
+  ol.pasos li { counter-increment:p; position:relative; padding:0 0 22px 46px; }
+  ol.pasos li::before {
+    content:counter(p); position:absolute; left:0; top:0; width:32px; height:32px;
+    border-radius:50%; background:var(--accent-soft); color:var(--accent-ink);
+    display:grid; place-items:center; font-size:14px; font-weight:700;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; border:1px solid var(--line);
+  }
+  ol.pasos li::after { content:""; position:absolute; left:16px; top:34px; bottom:0; width:1px; background:var(--line); }
+  ol.pasos li:last-child::after { display:none; }
+  ol.pasos b { display:block; font-size:17px; margin:4px 0 6px; }
+  ol.pasos p { margin:0 0 9px; color:var(--muted); font-size:14.5px; }
+  ol.pasos code { background:var(--accent-soft); color:var(--accent-ink); border-radius:4px; padding:1px 5px; font-size:.88em; }
+  a.enlace-pri { display:inline-block; text-decoration:none; background:var(--accent); color:#fff; border-radius:11px; padding:11px 18px; font-weight:700; font-size:15px; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="puerta">
+  <div class="marca">
+    <div class="tile"><img src="iconos/icono-512.png" alt="Where's my money?"></div>
+    <h1>Where&rsquo;s my money?</h1>
+    <p class="lema">Tres toques y sabes en qué se te va</p>
+  </div>
+
+  <div class="segmento">
+    <button id="tabEntrar" class="on">Entrar</button>
+    <button id="tabCrear">Crear cuenta</button>
+  </div>
+  <p id="puertaSub">Entra con tu usuario y tu clave.</p>
+  <div class="campo">
+    <label for="usuarioIn">Usuario</label>
+    <input type="text" id="usuarioIn" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="cómo te vas a llamar aquí">
+  </div>
+  <div class="campo">
+    <label for="claveIn">Clave</label>
+    <input type="password" id="claveIn" autocomplete="current-password" placeholder="mínimo 6 caracteres">
+  </div>
+  <button class="guardar" id="entrar">Entrar</button>
+  <div id="errClave" class="aviso mal" style="display:none;margin-top:12px"></div>
+  <p class="letra-chica">
+    Tus movimientos se guardan en la hoja de cálculo de quien hospeda esta app.
+    Solo tú ves tus números dentro de la app, pero la persona que la instaló tiene acceso al archivo.
+  </p>
+</div>
+
+<div id="jalon" aria-hidden="true">
+  <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div class="tile-chico" aria-hidden="true"><img src="iconos/icono-192.png" alt=""></div>
+    <div class="tit">
+      <h1 id="tituloPantalla">El mes</h1>
+      <div class="fecha" id="fechaHoy"></div>
+    </div>
+    <button class="btn-cfg" id="abrirCfg">Ajustes</button>
+  </header>
+
+  <!-- ============ REGISTRAR ============ -->
+  <section class="pantalla" id="p-registrar">
+    <div id="avisoReg"></div>
+
+    <div class="segmento">
+      <button id="tabGasto" class="on">Gasto</button>
+      <button id="tabIngreso">Ingreso</button>
+    </div>
+
+    <div class="tarjeta">
+      <div class="campo">
+        <label for="monto">Cuánto</label>
+        <input type="number" id="monto" inputmode="decimal" placeholder="0" step="0.01">
+      </div>
+      <div class="campo">
+        <label for="concepto" id="lblConcepto">En qué gastaste</label>
+        <input type="text" id="concepto" placeholder="Tacos, gasolina, café…" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label id="lblMetodo">Cómo pagaste</label>
+        <div class="chips" id="chipsMetodo"></div>
+      </div>
+      <div class="campo" style="margin-bottom:4px">
+        <label id="lblClase">Qué tipo de gasto fue</label>
+        <div class="chips" id="chipsClase"></div>
+      </div>
+    </div>
+
+    <button class="guardar" id="btnGuardar">Guardar</button>
+  </section>
+
+  <!-- ============ EL MES ============ -->
+  <section class="pantalla activa" id="p-mes">
+    <div class="tarjeta banner">
+      <div class="col">
+        <div class="et">Entró</div>
+        <div class="va num" id="banEntro">—</div>
+      </div>
+      <div class="col">
+        <div class="et">Salió</div>
+        <div class="va num" id="banSalio">—</div>
+      </div>
+      <div class="col">
+        <div class="et">Ahorrado</div>
+        <div class="va num" id="banAhorro">—</div>
+      </div>
+    </div>
+
+    <div class="tarjeta hero">
+      <div class="titulo-sec">Llevas gastado</div>
+      <div class="grande num" id="mesGastado">—</div>
+      <div class="de">de <span class="num" id="mesLimite"></span> este mes</div>
+      <div class="barra" id="mesBarra"><span style="width:0%"></span></div>
+      <div class="dosdatos">
+        <div><div class="et">Te queda</div><div class="va num" id="mesRestante">—</div></div>
+        <div><div class="et">Por día</div><div class="va num" id="mesDiario">—</div></div>
+      </div>
+      <div class="aviso ok" id="mesAlerta" style="display:none;margin:12px 0 0"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">En qué se te va</div>
+      <div id="donaWrap"></div>
+      <div class="leyenda" id="donaLeyenda"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Entradas y salidas</div>
+      <div class="leyenda" id="flujo"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Qué días gastas más</div>
+      <div id="diasWrap"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Tus gastos más grandes</div>
+      <div class="lista" id="topLista"></div>
+    </div>
+
+  </section>
+
+  <!-- ============ MOVIMIENTOS ============ -->
+  <section class="pantalla" id="p-movimientos">
+    <div class="tarjeta">
+      <div class="titulo-sec">Todo lo que has registrado</div>
+      <div class="lista" id="recientes"></div>
+    </div>
+  </section>
+
+  <!-- ============ HISTORIA ============ -->
+  <section class="pantalla" id="p-historia">
+    <div class="tarjeta">
+      <div class="titulo-sec">Lo que entra contra lo que sale</div>
+      <div id="barrasWrap"></div>
+      <div class="leyenda" style="margin-top:12px">
+        <div class="fila"><span class="sw" style="background:var(--c-in)"></span><span class="nom">Ingresos</span></div>
+        <div class="fila"><span class="sw" style="background:var(--c-out)"></span><span class="nom">Gastos</span></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Tu ahorro acumulado</div>
+      <div id="acumWrap"></div>
+      <div class="dosdatos" style="margin-top:12px">
+        <div><div class="et">Total ahorrado</div><div class="va num" id="histAcum">—</div></div>
+        <div><div class="et">Tu mejor mes</div><div class="va" id="histMejor">—</div></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Cuánto logras no gastar</div>
+      <div id="tasaWrap"></div>
+    </div>
+  </section>
+
+  <!-- ============ COMPARTIR ============ -->
+  <section class="pantalla" id="p-compartir">
+    <div class="tarjeta">
+      <div class="titulo-sec">Atajos para tu iPhone</div>
+      <p style="margin:0 0 14px;font-size:14.5px;color:var(--muted)">
+        Sirven para registrar un gasto en tres toques, sin abrir esta app. Son cinco pasos y se hacen una sola vez.
+      </p>
+      <ol class="mini-pasos">
+        <li><b>Instala Configurar.</b> Toca su botón verde. Se abre Atajos con la lista de lo que hace: <b>baja hasta el fondo</b>, porque el botón <i>Añadir atajo</i> está hasta abajo del todo.</li>
+        <li><b>Manda tu código.</b> Regresa aquí y toca el botón grande de hasta abajo. Se abre Atajos, confirmas, y tu código queda guardado en el teléfono. Solo se hace una vez.</li>
+        <li><b>Instala <i>Gasto</i> y <i>¿Cómo voy?</i></b> Igual que el primero, bajando hasta el fondo. El de Gasto es largo, no te asustes. Estos ya no te preguntan nada.</li>
+        <li><b>Pruébalo.</b> Corre <i>Gasto</i> desde la app Atajos y registra algo de un peso, para ver que llegue.</li>
+        <li><b>Ponlo a la mano.</b> En <i>Ajustes → Accesibilidad → Tocar → Tocar la parte posterior</i> puedes dejar que un doble toque atrás del teléfono lance <i>Gasto</i>. También puedes agregarlo al Centro de Control o a tu pantalla de inicio.</li>
+      </ol>
+      <div id="listaAtajos"></div>
+      <details id="cajaOpcionales" style="display:none;margin-top:6px">
+        <summary>Otros dos, si los quieres</summary>
+        <p class="nota-op">La app ya hace las dos cosas: puedes registrar un ingreso desde <b>Nuevo</b> y borrar cualquier movimiento desde <b>Movs</b>. Estos atajos solo te los ahorran de abrir.</p>
+        <div id="listaOpcionales"></div>
+      </details>
+      <a class="guardar" id="btnMandarCodigo" href="#" target="_blank" rel="noopener"
+         style="display:none;text-align:center;text-decoration:none;box-sizing:border-box;margin-top:14px">Mandar mi código a los atajos</a>
+      <p id="notaCodigo" style="display:none;margin:10px 0 0;font-size:12.5px;color:var(--muted)">
+        Se va a abrir la app Atajos y te va a pedir confirmar. Si te dice que no encuentra el atajo, es que todavía no instalaste <b>Configurar</b> arriba, o que le cambiaste el nombre al instalarlo. Si de plano no pasa nada, copia tu código de aquí abajo y córrelo a mano desde la app Atajos.
+      </p>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Tu código para los atajos</div>
+      <div class="dato-copiar"><code class="num" id="miClave">—</code><button class="mini" data-copiar="miClave">Copiar</button></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Es lo que le pegas a cada atajo la primera vez. No es tu clave de entrar: si se te sale de las manos, aquí mismo lo cambias sin tocar tu cuenta.</p>
+      <div class="fila-btn" style="margin-top:12px">
+        <button id="btnCambiarClave">Cambiar mi clave</button>
+        <button id="btnNuevoToken">Código nuevo</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">El enlace de la app</div>
+      <div class="dato-copiar"><code id="miUrl" style="font-size:11.5px">—</code><button class="mini" data-copiar="miUrl">Copiar</button></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Este sí lo puedes compartir. Quien lo abra crea su propia cuenta y no ve nada de lo tuyo.</p>
+    </div>
+
+    <div class="tarjeta" id="tarjetaInicio">
+      <div class="titulo-sec">Ponla en tu pantalla de inicio</div>
+      <p style="margin:0 0 8px;font-size:14px">Así queda con el cochinito y el nombre <strong>WMM?</strong>, y abre sin barra de Safari.</p>
+      <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:var(--muted)">
+        <li>Abre este enlace en <strong>Safari</strong> (en Chrome no sale la opción).</li>
+        <li>Toca el botón de <strong>Compartir</strong>, el cuadrito con la flecha hacia arriba.</li>
+        <li>Baja y elige <strong>Añadir a pantalla de inicio</strong>.</li>
+        <li>Toca <strong>Añadir</strong>. Ya está.</li>
+      </ol>
+    </div>
+
+    <div class="tarjeta">
+      <div class="titulo-sec">Tu cuenta</div>
+      <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    <button data-p="mes" class="on">
+      <svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>Mes
+    </button>
+    <button data-p="movimientos">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Movs
+    </button>
+    <button data-p="historia">
+      <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-8 4 5"/><path d="M3 21h18"/></svg>Historia
+    </button>
+    <button data-p="registrar">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Nuevo
+    </button>
+    <button data-p="compartir">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>Cuenta
+    </button>
+  </nav>
+</div>
+
+<dialog id="dlgCfg">
+  <div class="cuerpo">
+    <h2>Ajustes</h2>
+    <details class="grupo">
+      <summary>Mi nombre de usuario</summary>
+      <div class="campo" style="margin-top:10px">
+        <input type="text" id="nuevoUsuario" autocapitalize="none" spellcheck="false" placeholder="cómo te quieres llamar">
+      </div>
+      <p class="pista">Se guarda en minúsculas y sin acentos. Los espacios se vuelven punto: <i>Cristóbal Navarro</i> queda como <i>cristobal.navarro</i>. Tus movimientos se van contigo.</p>
+      <button class="chico pri" id="guardarUsuario">Cambiar mi usuario</button>
+    </details>
+
+    <details class="grupo">
+      <summary>Límite de gasto del mes</summary>
+      <div class="campo" style="margin-top:10px">
+        <input type="number" id="nuevoLimite" inputmode="decimal">
+      </div>
+      <p class="pista">Es tu tope mensual. La app te avisa al 75%, al 90% y cuando te pasas.</p>
+      <button class="chico pri" id="guardarLimite">Guardar límite</button>
+    </details>
+
+    <details class="grupo">
+      <summary>Mi clave</summary>
+      <p class="pista" style="margin-top:10px">Es con la que entras a la app. Para cambiarla te va a pedir primero la de ahora.</p>
+      <button class="chico" id="btnCambiarClave2">Cambiar mi clave</button>
+    </details>
+
+    <div class="fila-btn" style="margin-top:16px">
+      <button id="cerrarCfg">Cerrar</button>
+      <button id="salir">Cerrar sesión</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+/* ============ estado ============ */
+var TOKEN = '';
+var USUARIO = '';
+var modoCrear = false;
+var E = null;              // último estado recibido
+var tipo = 'Gasto';
+var metodoSel = 'Tarjeta';
+var claseSel = '';
+var COLOR = { 'Necesario':'--c-nec', 'Ocio':'--c-oci', 'Innecesario':'--c-inn', 'Hormiga':'--c-hor' };
+
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function colorCat(c) { return css(COLOR[c] || '--c-ref'); }
+function $(id) { return document.getElementById(id); }
+
+var fmt = new Intl.NumberFormat('es-MX', { style:'currency', currency:'MXN', minimumFractionDigits:0, maximumFractionDigits:2 });
+function pesos(n) { return fmt.format(Number(n) || 0).replace(/ /g, ' '); }
+function pesosCorto(n) {
+  n = Number(n) || 0;
+  if (Math.abs(n) >= 1000) return '$' + Math.round(n / 1000) + 'k';
+  return '$' + Math.round(n);
+}
+
+function guardaToken(t) { try { localStorage.setItem('gastos-token', t); } catch (e) {} }
+function leeToken() { try { return localStorage.getItem('gastos-token') || ''; } catch (e) { return ''; } }
+function borraToken() { try { localStorage.removeItem('gastos-token'); } catch (e) {} }
+
+/* ============ llamadas al servidor ============ */
+// La dirección vive en config.js, al lado de este archivo. Ahí es donde se cambia.
+var API = (typeof CONFIG_API === 'string') ? CONFIG_API.trim() : '';
+var FALTA_API = !API || API.indexOf('/exec') === -1;
+var SIN_RED = 'No se pudo conectar. Revisa tu internet.';
+var SIN_API = 'Esta copia todavía no está conectada: falta pegar la dirección del servidor en config.js.';
+
+function pedir(datos) {
+  if (FALTA_API) {
+    return Promise.reject(new Error('Falta pegar la dirección del servidor en config.js'));
+  }
+  // El tipo text/plain es a propósito: así el navegador manda la petición
+  // directa, sin pedirle permiso antes al servidor de Google.
+  return fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(datos),
+    redirect: 'follow'
+  }).then(function (r) { return r.json(); });
+}
+
+function llamar(accion, datos, alTerminar, alFallar) {
+  var cuerpo = { accion: accion, token: TOKEN, conestado: 1 };
+  if (datos) for (var k in datos) if (Object.prototype.hasOwnProperty.call(datos, k)) cuerpo[k] = datos[k];
+  pedir(cuerpo).then(function (r) {
+    if (r && r.sesionCaida) { borraToken(); location.reload(); return; }
+    alTerminar && alTerminar(r);
+  }).catch(function () {
+    if (alFallar) alFallar();
+    else avisar(FALTA_API ? SIN_API : SIN_RED, false);
+  });
+}
+
+/* ============ entrada ============ */
+$('tabEntrar').addEventListener('click', function () { modo(false); });
+$('tabCrear').addEventListener('click', function () { modo(true); });
+$('claveIn').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') intentar(); });
+$('usuarioIn').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') $('claveIn').focus(); });
+$('entrar').addEventListener('click', intentar);
+
+function modo(crear) {
+  modoCrear = crear;
+  $('tabEntrar').classList.toggle('on', !crear);
+  $('tabCrear').classList.toggle('on', crear);
+  $('entrar').textContent = crear ? 'Crear mi cuenta' : 'Entrar';
+  $('puertaSub').textContent = crear ? 'Elige un usuario y una clave. Nadie más verá tus números.'
+                                     : 'Entra con tu usuario y tu clave.';
+  $('claveIn').setAttribute('autocomplete', crear ? 'new-password' : 'current-password');
+  $('errClave').style.display = 'none';
+}
+
+function intentar() {
+  var u = $('usuarioIn').value.trim();
+  var c = $('claveIn').value;
+  if (!u || !c) { error('Escribe tu usuario y tu clave.'); return; }
+  $('entrar').disabled = true;
+  $('entrar').textContent = modoCrear ? 'Creando…' : 'Entrando…';
+
+  var alVolver = function (r) {
+    $('entrar').disabled = false;
+    modo(modoCrear);
+    if (!r || !r.ok) { error((r && r.mensaje) || 'No se pudo.'); return; }
+    TOKEN = r.token; USUARIO = r.usuario;
+    guardaToken(r.token);
+    $('puerta').innerHTML = '<div class="cargando">Cargando tus números…</div>';
+    llamar('estado', {}, function (e) {
+      if (e && e.ok) arrancar(e); else error('Entraste, pero no cargaron tus datos.');
+    });
+  };
+  var alFallar = function () {
+    $('entrar').disabled = false; modo(modoCrear);
+    error(FALTA_API ? SIN_API : SIN_RED);
+  };
+
+  pedir({ accion: modoCrear ? 'crear' : 'entrar', usuario: u, clave: c })
+    .then(alVolver).catch(alFallar);
+}
+
+function error(t) {
+  $('errClave').textContent = t;
+  $('errClave').style.display = 'block';
+}
+
+function arrancar(estado) {
+  $('puerta').style.display = 'none';
+  $('app').classList.add('listo');
+  USUARIO = estado.usuario || USUARIO;
+  pintar(estado);
+}
+
+/* ============ navegación ============ */
+var nombres = { mes:'El mes', movimientos:'Movimientos', historia:'Historia', registrar:'Registrar', compartir:'Mi cuenta' };
+Array.prototype.forEach.call(document.querySelectorAll('nav.tabs button'), function (b) {
+  b.addEventListener('click', function () {
+    var p = b.dataset.p;
+    Array.prototype.forEach.call(document.querySelectorAll('nav.tabs button'), function (x) { x.classList.toggle('on', x === b); });
+    Array.prototype.forEach.call(document.querySelectorAll('.pantalla'), function (s) { s.classList.toggle('activa', s.id === 'p-' + p); });
+    $('tituloPantalla').textContent = nombres[p];
+    window.scrollTo(0, 0);
+  });
+});
+
+/* ============ formulario ============ */
+$('tabGasto').addEventListener('click', function () { cambiaTipo('Gasto'); });
+$('tabIngreso').addEventListener('click', function () { cambiaTipo('Ingreso'); });
+
+function cambiaTipo(t) {
+  tipo = t;
+  $('tabGasto').classList.toggle('on', t === 'Gasto');
+  $('tabIngreso').classList.toggle('on', t === 'Ingreso');
+  $('lblConcepto').textContent = t === 'Gasto' ? 'En qué gastaste' : 'De qué fue';
+  $('concepto').placeholder = t === 'Gasto' ? 'Tacos, gasolina, café…' : 'Quincena, venta, regalo…';
+  $('lblMetodo').textContent = t === 'Gasto' ? 'Cómo pagaste' : 'Dónde cayó';
+  $('lblClase').textContent = t === 'Gasto' ? 'Qué tipo de gasto fue' : 'De dónde viene';
+  $('btnGuardar').textContent = t === 'Gasto' ? 'Guardar gasto' : 'Guardar ingreso';
+  $('btnGuardar').style.background = t === 'Gasto' ? css('--accent') : css('--c-in');
+  claseSel = '';
+  pintarChips();
+}
+
+function pintarChips() {
+  var cm = $('chipsMetodo'); cm.innerHTML = '';
+  ['Tarjeta', 'Efectivo'].forEach(function (m) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (metodoSel === m ? ' on' : '');
+    b.type = 'button'; b.textContent = m;
+    b.addEventListener('click', function () { metodoSel = m; pintarChips(); });
+    cm.appendChild(b);
+  });
+
+  var lista = tipo === 'Gasto' ? (E ? E.categorias : []) : (E ? E.fuentes : []);
+  if (!claseSel && lista.length) claseSel = lista[0];
+  var cc = $('chipsClase'); cc.innerHTML = '';
+  lista.forEach(function (c) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (claseSel === c ? ' on' : '');
+    b.type = 'button';
+    if (tipo === 'Gasto') {
+      var p = document.createElement('span');
+      p.className = 'punto'; p.style.background = colorCat(c);
+      b.appendChild(p);
+    }
+    b.appendChild(document.createTextNode(c));
+    b.addEventListener('click', function () { claseSel = c; pintarChips(); });
+    cc.appendChild(b);
+  });
+}
+
+$('btnGuardar').addEventListener('click', function () {
+  var monto = parseFloat($('monto').value);
+  if (!(monto > 0)) { avisar('Escribe cuánto fue.', false); $('monto').focus(); return; }
+  var concepto = $('concepto').value.trim() || (tipo === 'Gasto' ? 'Sin concepto' : 'Ingreso');
+
+  var datos = { concepto: concepto, monto: monto, metodo: metodoSel };
+  if (tipo === 'Gasto') datos.categoria = claseSel; else datos.fuente = claseSel;
+
+  $('btnGuardar').disabled = true;
+  $('btnGuardar').textContent = 'Guardando…';
+  llamar(tipo === 'Gasto' ? 'gasto' : 'ingreso', datos, function (r) {
+    $('btnGuardar').disabled = false;
+    cambiaTipo(tipo);
+    if (!r || !r.ok) { avisar((r && r.mensaje) || 'No se pudo guardar.', false); return; }
+    $('monto').value = ''; $('concepto').value = '';
+    avisar(r.mensaje, true);
+    if (r.estado) pintar(r.estado);
+  }, function () {
+    $('btnGuardar').disabled = false;
+    cambiaTipo(tipo);
+    avisar('Sin conexión. No se guardó, inténtalo otra vez.', false);
+  });
+});
+
+function avisar(texto, bien) {
+  var d = $('avisoReg');
+  d.innerHTML = '';
+  var caja = document.createElement('div');
+  caja.className = 'aviso ' + (bien ? 'ok' : 'mal');
+  caja.textContent = texto;
+  d.appendChild(caja);
+  window.scrollTo(0, 0);
+  if (bien) setTimeout(function () { if (d.firstChild === caja) d.innerHTML = ''; }, 9000);
+}
+
+/* ============ ajustes ============ */
+$('abrirCfg').addEventListener('click', function () {
+  $('nuevoLimite').value = E ? E.resumen.limite : '';
+  $('nuevoUsuario').value = USUARIO || '';
+  $('dlgCfg').showModal();
+});
+
+$('guardarUsuario').addEventListener('click', function () {
+  var n = $('nuevoUsuario').value.trim();
+  if (!n) return;
+  $('guardarUsuario').textContent = 'Cambiando…';
+  llamar('usuario', { nuevo: n }, function (r) {
+    $('guardarUsuario').textContent = 'Cambiar mi usuario';
+    if (!r) return;
+    alert(r.mensaje);
+    if (r.ok) {
+      USUARIO = r.usuario;
+      $('nuevoUsuario').value = r.usuario;
+      if (r.estado) pintar(r.estado);
+    }
+  });
+});
+
+$('btnCambiarClave2').addEventListener('click', function () { cambiarMiClave(); });
+$('cerrarCfg').addEventListener('click', function () { $('dlgCfg').close(); });
+$('guardarLimite').addEventListener('click', function () {
+  var n = parseFloat($('nuevoLimite').value);
+  if (!(n > 0)) return;
+  $('guardarLimite').textContent = 'Guardando…';
+  llamar('limite', { monto: n }, function (r) {
+    $('guardarLimite').textContent = 'Guardar límite';
+    if (r && r.estado) pintar(r.estado);
+    $('dlgCfg').close();
+  });
+});
+$('salir').addEventListener('click', function () {
+  borraToken();
+  location.reload();
+});
+
+/* ============ pintar todo ============ */
+function pintar(estado) {
+  E = estado;
+  var r = estado.resumen;
+  $('fechaHoy').textContent = estado.hoy;
+
+  $('mesGastado').textContent = pesos(r.gastos);
+  $('mesLimite').textContent = pesos(r.limite);
+  var pct = Math.max(0, Math.min(100, r.porcentaje));
+  var barra = $('mesBarra');
+  barra.className = 'barra' + (r.restante < 0 ? ' pasado' : (r.porcentaje >= 75 ? ' alta' : ''));
+  barra.firstElementChild.style.width = pct + '%';
+  $('mesRestante').textContent = pesos(r.restante);
+  $('mesDiario').textContent = pesos(r.diario);
+
+  var al = $('mesAlerta');
+  if (r.restante < 0) {
+    al.style.display = 'block'; al.className = 'aviso mal';
+    al.textContent = 'Te pasaste por ' + pesos(Math.abs(r.restante)) + '. Quedan ' + r.diasRestantes + ' días del mes.';
+  } else if (r.porcentaje >= 75) {
+    al.style.display = 'block'; al.className = 'aviso mal';
+    al.textContent = 'Ya usaste el ' + r.porcentaje + '% del límite, y faltan ' + r.diasRestantes + ' días.';
+  } else {
+    al.style.display = 'none';
+  }
+
+  dibujaDona(estado);
+  pintaFlujo(r);
+  dibujaDias(estado.diaSemana);
+  pintaTop(estado.topGastos);
+  pintaRecientes(estado.recientes);
+  dibujaHistoria(estado.meses);
+  var ahorro = estado.meses.length ? estado.meses[estado.meses.length - 1].acumulado : 0;
+  $('banEntro').textContent = pesos(r.ingresos);
+  $('banSalio').textContent = pesos(r.gastos);
+  $('banAhorro').textContent = pesos(ahorro);
+  $('banAhorro').style.color = ahorro < 0 ? css('--danger') : css('--ink');
+  pintaCompartir(estado.cuenta);
+  pintarChips();
+}
+
+/* ---------- compartir ---------- */
+function pintaCompartir(c) {
+  if (!c) return;
+  $('miClave').textContent = c.token || '—';
+  // Enlace que abre Atajos y corre "Configurar" con el código ya adentro.
+  var b = $('btnMandarCodigo');
+  if (c.token && c.atajos && c.atajos.length) {
+    b.href = 'shortcuts://run-shortcut?name=' + encodeURIComponent('Configurar') +
+             '&input=text&text=' + encodeURIComponent(c.token);
+    b.style.display = 'block';
+    $('notaCodigo').style.display = 'block';
+  } else {
+    b.style.display = 'none';
+    $('notaCodigo').style.display = 'none';
+  }
+  $('miUrl').textContent = location.origin + location.pathname;
+  $('quienSoy').textContent = USUARIO || '—';
+
+  var l = $('listaAtajos'), op = $('listaOpcionales'), caja = $('cajaOpcionales');
+  l.innerHTML = ''; op.innerHTML = ''; caja.style.display = 'none';
+  if (!c.atajos || !c.atajos.length) {
+    l.innerHTML = '<div class="vacio">Los atajos todavía no están publicados.</div>';
+    return;
+  }
+  var hayOpcionales = false;
+  c.atajos.forEach(function (a) {
+    var d = document.createElement('div');
+    d.className = 'atajo' + (a.primero ? ' primero' : '');
+    d.innerHTML = '<div class="ico">' + (a.primero ? '1' : '＋') + '</div><div class="txt"><b></b><span></span></div>' +
+                  '<a target="_blank" rel="noopener">Instalar</a>';
+    d.querySelector('b').textContent = a.nombre;
+    d.querySelector('span').textContent = a.detalle;
+    d.querySelector('a').href = a.enlace;
+    if (a.opcional) { op.appendChild(d); hayOpcionales = true; } else { l.appendChild(d); }
+  });
+  caja.style.display = hayOpcionales ? 'block' : 'none';
+}
+
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest && ev.target.closest('button.mini[data-copiar]');
+  if (!b) return;
+  var texto = $(b.dataset.copiar).textContent;
+  var listo = function () {
+    var antes = b.textContent;
+    b.textContent = 'Copiado'; b.classList.add('hecho');
+    setTimeout(function () { b.textContent = antes; b.classList.remove('hecho'); }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(listo, seleccionar);
+  else seleccionar();
+  function seleccionar() {
+    var r = document.createRange(); r.selectNodeContents($(b.dataset.copiar));
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    try { document.execCommand('copy'); listo(); } catch (e) { b.textContent = 'Selecciona y copia'; }
+  }
+});
+
+function cambiarMiClave() {
+  var actual = prompt('Tu clave de ahora:');
+  if (!actual) return;
+  var nueva = prompt('Tu clave nueva (mínimo 6 caracteres):');
+  if (!nueva) return;
+  llamar('clave', { actual: actual, nueva: nueva }, function (r) { if (r) alert(r.mensaje); });
+}
+$('btnCambiarClave').addEventListener('click', cambiarMiClave);
+
+$('btnNuevoToken').addEventListener('click', function () {
+  if (!confirm('Se genera un código nuevo y el de ahora deja de servir. Vas a tener que actualizarlo en tus atajos. ¿Seguimos?')) return;
+  llamar('token', {}, function (r) {
+    if (!r) return;
+    alert(r.mensaje);
+    if (r.ok && r.estado) pintar(r.estado);
+  });
+});
+
+/* ---------- dona de categorías ---------- */
+function dibujaDona(estado) {
+  var cats = estado.categorias.map(function (c) {
+    return { nombre:c, valor: estado.resumen.porCategoria[c] || 0, color: colorCat(c) };
+  });
+  var total = cats.reduce(function (s, c) { return s + c.valor; }, 0);
+  var wrap = $('donaWrap'), ley = $('donaLeyenda');
+  wrap.innerHTML = ''; ley.innerHTML = '';
+
+  if (total <= 0) {
+    wrap.innerHTML = '<div class="vacio">Todavía no hay gastos este mes.</div>';
+    return;
+  }
+
+  var S = 180, R = 76, r0 = 48, cx = S / 2, cy = S / 2, ang = -Math.PI / 2;
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + S + ' ' + S);
+  svg.setAttribute('class', 'g');
+  svg.style.maxWidth = '200px';
+  svg.style.margin = '0 auto 14px';
+  svg.setAttribute('role', 'img');
+
+  cats.forEach(function (c) {
+    if (c.valor <= 0) return;
+    var frac = c.valor / total;
+    var barrido = frac * Math.PI * 2;
+    var hueco = Math.min(0.045, barrido / 6);      // separación entre rebanadas
+    var a0 = ang + hueco / 2, a1 = ang + barrido - hueco / 2;
+    var grande = (a1 - a0) > Math.PI ? 1 : 0;
+    var p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', [
+      'M', cx + R * Math.cos(a0), cy + R * Math.sin(a0),
+      'A', R, R, 0, grande, 1, cx + R * Math.cos(a1), cy + R * Math.sin(a1),
+      'L', cx + r0 * Math.cos(a1), cy + r0 * Math.sin(a1),
+      'A', r0, r0, 0, grande, 0, cx + r0 * Math.cos(a0), cy + r0 * Math.sin(a0), 'Z'
+    ].join(' '));
+    p.setAttribute('fill', c.color);
+    svg.appendChild(p);
+    ang += barrido;
+  });
+
+  var t1 = document.createElementNS(ns, 'text');
+  t1.setAttribute('x', cx); t1.setAttribute('y', cy - 2);
+  t1.setAttribute('text-anchor', 'middle'); t1.setAttribute('fill', css('--ink'));
+  t1.setAttribute('font-size', '17'); t1.setAttribute('font-weight', '700');
+  t1.textContent = pesosCorto(total);
+  svg.appendChild(t1);
+  var t2 = document.createElementNS(ns, 'text');
+  t2.setAttribute('x', cx); t2.setAttribute('y', cy + 14);
+  t2.setAttribute('text-anchor', 'middle'); t2.setAttribute('fill', css('--muted'));
+  t2.setAttribute('font-size', '10');
+  t2.textContent = 'gastado';
+  svg.appendChild(t2);
+  wrap.appendChild(svg);
+
+  cats.forEach(function (c) {
+    var f = document.createElement('div');
+    f.className = 'fila';
+    f.innerHTML = '<span class="sw"></span><span class="nom"></span><span class="val num"></span>';
+    f.querySelector('.sw').style.background = c.color;
+    f.querySelector('.nom').textContent = c.nombre;
+    f.querySelector('.val').textContent = pesos(c.valor) + '  ·  ' + Math.round(c.valor / total * 100) + '%';
+    ley.appendChild(f);
+  });
+}
+
+/* ---------- tarjeta vs efectivo ---------- */
+function pintaFlujo(r) {
+  var f = $('flujo');
+  f.innerHTML = '';
+  var filas = [
+    ['Gastos con tarjeta', r.tarjeta, css('--c-out')],
+    ['Gastos en efectivo', r.efectivo, css('--c-out')],
+    ['Ingresos a tarjeta', r.ingresoTarjeta, css('--c-in')],
+    ['Ingresos en efectivo', r.ingresoEfectivo, css('--c-in')]
+  ];
+  if (r.gastoOtro) filas.splice(2, 0, ['Gastos sin método', r.gastoOtro, css('--c-ref')]);
+  if (r.ingresoOtro) filas.push(['Ingresos sin método', r.ingresoOtro, css('--c-ref')]);
+  filas.forEach(function (x) {
+    var d = document.createElement('div');
+    d.className = 'fila';
+    d.innerHTML = '<span class="sw"></span><span class="nom"></span><span class="val num"></span>';
+    d.querySelector('.sw').style.background = x[2];
+    d.querySelector('.nom').textContent = x[0];
+    d.querySelector('.val').textContent = pesos(x[1]);
+    f.appendChild(d);
+  });
+}
+
+/* ---------- días de la semana ---------- */
+function dibujaDias(dias) {
+  var wrap = $('diasWrap');
+  wrap.innerHTML = '';
+  var max = Math.max.apply(null, dias.map(function (d) { return d.monto; }).concat([1]));
+  if (max <= 1) { wrap.innerHTML = '<div class="vacio">Todavía no hay gastos este mes.</div>'; return; }
+
+  dias.forEach(function (d) {
+    var fila = document.createElement('div');
+    fila.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:7px';
+    var et = document.createElement('div');
+    et.style.cssText = 'width:74px;font-size:13px;color:var(--muted)';
+    et.textContent = d.dia;
+    var pista = document.createElement('div');
+    pista.style.cssText = 'flex:1;height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden';
+    var b = document.createElement('div');
+    b.style.cssText = 'height:100%;border-radius:5px;background:' + css('--c-nec') + ';width:' + (d.monto / max * 100) + '%';
+    pista.appendChild(b);
+    var v = document.createElement('div');
+    v.className = 'num';
+    v.style.cssText = 'width:62px;text-align:right;font-size:13px;color:' + (d.monto ? 'var(--ink)' : 'var(--muted)');
+    v.textContent = d.monto ? pesosCorto(d.monto) : '—';
+    fila.appendChild(et); fila.appendChild(pista); fila.appendChild(v);
+    wrap.appendChild(fila);
+  });
+}
+
+/* ---------- listas ---------- */
+function pintaTop(top) {
+  var l = $('topLista');
+  l.innerHTML = '';
+  if (!top.length) { l.innerHTML = '<div class="vacio">Todavía no hay gastos este mes.</div>'; return; }
+  top.forEach(function (t) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div><div class="mto num"></div>';
+    d.querySelector('.bolita').style.background = colorCat(t.categoria);
+    d.querySelector('.c').textContent = t.concepto;
+    d.querySelector('.m').textContent = t.categoria;
+    d.querySelector('.mto').textContent = pesos(t.monto);
+    l.appendChild(d);
+  });
+}
+
+function pintaRecientes(movs) {
+  var l = $('recientes');
+  l.innerHTML = '';
+  if (!movs.length) { l.innerHTML = '<div class="vacio">Nada registrado todavía.</div>'; return; }
+  movs.forEach(function (m) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div><button class="borrar" title="Borrar">&times;</button>';
+    d.querySelector('.bolita').style.background = m.tipo === 'Ingreso' ? css('--c-in') : colorCat(m.etiqueta);
+    d.querySelector('.c').textContent = m.concepto;
+    d.querySelector('.m').textContent = m.cuando + ' · ' + m.etiqueta + (m.metodo ? ' · ' + m.metodo : '');
+    var mto = d.querySelector('.mto');
+    mto.textContent = (m.tipo === 'Ingreso' ? '+' : '') + pesos(m.monto);
+    if (m.tipo === 'Ingreso') mto.classList.add('ing');
+    d.querySelector('.borrar').addEventListener('click', function () {
+      if (!confirm('¿Borrar "' + m.concepto + '" de ' + pesos(m.monto) + '?')) return;
+      llamar('borrar', { fila: m.fila }, function (r) {
+        if (r && r.estado) pintar(r.estado);
+      });
+    });
+    l.appendChild(d);
+  });
+}
+
+/* ---------- historia ---------- */
+function dibujaHistoria(meses) {
+  var ns = 'http://www.w3.org/2000/svg';
+  var conDatos = meses.filter(function (m) { return m.ingresos > 0 || m.gastos > 0; });
+
+  // 1) columnas: ingresos contra gastos
+  var w = 340, h = 150, pieL = 6, pieB = 20, pieT = 8;
+  var bw = $('barrasWrap'); bw.innerHTML = '';
+  if (!conDatos.length) {
+    bw.innerHTML = '<div class="vacio">Aún no hay meses que comparar. Vuelve el mes que entra.</div>';
+  } else {
+    var max = Math.max.apply(null, meses.map(function (m) { return Math.max(m.ingresos, m.gastos); }).concat([1]));
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.setAttribute('class', 'g');
+    var ancho = (w - pieL) / meses.length, barra = Math.min(7, ancho / 3);
+    meses.forEach(function (m, i) {
+      var x = pieL + i * ancho + ancho / 2;
+      [[m.ingresos, css('--c-in'), -barra - 1], [m.gastos, css('--c-out'), 1]].forEach(function (par) {
+        if (par[0] <= 0) return;
+        var alto = Math.max(2, (par[0] / max) * (h - pieB - pieT));
+        var rect = document.createElementNS(ns, 'rect');
+        rect.setAttribute('x', x + par[2]); rect.setAttribute('y', h - pieB - alto);
+        rect.setAttribute('width', barra); rect.setAttribute('height', alto);
+        rect.setAttribute('rx', Math.min(3, barra / 2)); rect.setAttribute('fill', par[1]);
+        svg.appendChild(rect);
+      });
+      if (i % 2 === meses.length % 2) {
+        var t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', x); t.setAttribute('y', h - 6);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '9');
+        t.setAttribute('fill', css('--muted'));
+        t.textContent = m.etiqueta;
+        svg.appendChild(t);
+      }
+    });
+    var base = document.createElementNS(ns, 'line');
+    base.setAttribute('x1', 0); base.setAttribute('x2', w);
+    base.setAttribute('y1', h - pieB); base.setAttribute('y2', h - pieB);
+    base.setAttribute('stroke', css('--line'));
+    svg.appendChild(base);
+    bw.appendChild(svg);
+  }
+
+  // 2) ahorro acumulado
+  var aw = $('acumWrap'); aw.innerHTML = '';
+  var acumFinal = meses.length ? meses[meses.length - 1].acumulado : 0;
+  $('histAcum').textContent = pesos(acumFinal);
+  var mejor = null;
+  meses.forEach(function (m) { if ((m.ingresos || m.gastos) && (!mejor || m.balance > mejor.balance)) mejor = m; });
+  $('histMejor').textContent = mejor ? (mejor.etiqueta + ' · ' + pesosCorto(mejor.balance)) : '—';
+
+  if (!conDatos.length) {
+    aw.innerHTML = '<div class="vacio">La curva aparece cuando tengas dos meses registrados.</div>';
+  } else {
+    var vals = meses.map(function (m) { return m.acumulado; });
+    var vmin = Math.min.apply(null, vals.concat([0])), vmax = Math.max.apply(null, vals.concat([0]));
+    if (vmax === vmin) vmax = vmin + 1;
+    var h2 = 130, pb = 18, pt = 10;
+    var yDe = function (v) { return pt + (1 - (v - vmin) / (vmax - vmin)) * (h2 - pb - pt); };
+    var xDe = function (i) { return 6 + i * ((w - 12) / Math.max(1, meses.length - 1)); };
+    var s2 = document.createElementNS(ns, 'svg');
+    s2.setAttribute('viewBox', '0 0 ' + w + ' ' + h2); s2.setAttribute('class', 'g');
+
+    if (vmin < 0) {
+      var cero = document.createElementNS(ns, 'line');
+      cero.setAttribute('x1', 0); cero.setAttribute('x2', w);
+      cero.setAttribute('y1', yDe(0)); cero.setAttribute('y2', yDe(0));
+      cero.setAttribute('stroke', css('--c-ref')); cero.setAttribute('stroke-dasharray', '4 4');
+      s2.appendChild(cero);
+    }
+    var pts = meses.map(function (m, i) { return xDe(i) + ',' + yDe(m.acumulado); }).join(' ');
+    var linea = document.createElementNS(ns, 'polyline');
+    linea.setAttribute('points', pts); linea.setAttribute('fill', 'none');
+    linea.setAttribute('stroke', acumFinal >= 0 ? css('--c-in') : css('--danger'));
+    linea.setAttribute('stroke-width', '2.5');
+    linea.setAttribute('stroke-linejoin', 'round'); linea.setAttribute('stroke-linecap', 'round');
+    s2.appendChild(linea);
+
+    var fin = document.createElementNS(ns, 'circle');
+    fin.setAttribute('cx', xDe(meses.length - 1)); fin.setAttribute('cy', yDe(acumFinal));
+    fin.setAttribute('r', '4.5');
+    fin.setAttribute('fill', acumFinal >= 0 ? css('--c-in') : css('--danger'));
+    fin.setAttribute('stroke', css('--surface')); fin.setAttribute('stroke-width', '2');
+    s2.appendChild(fin);
+    aw.appendChild(s2);
+  }
+
+  // 3) tasa de ahorro
+  var tw = $('tasaWrap'); tw.innerHTML = '';
+  var conIngreso = meses.filter(function (m) { return m.ingresos > 0; });
+  if (!conIngreso.length) {
+    tw.innerHTML = '<div class="vacio">Registra un ingreso para ver esto.</div>';
+    return;
+  }
+  conIngreso.slice(-6).forEach(function (m) {
+    var pctv = Math.round(m.tasa * 100);
+    var fila = document.createElement('div');
+    fila.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:7px';
+    var et = document.createElement('div');
+    et.style.cssText = 'width:52px;font-size:13px;color:var(--muted)';
+    et.textContent = m.etiqueta;
+    var pista = document.createElement('div');
+    pista.style.cssText = 'flex:1;height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden';
+    var b = document.createElement('div');
+    b.style.cssText = 'height:100%;border-radius:5px;background:' + (pctv >= 0 ? css('--c-oci') : css('--danger')) +
+                      ';width:' + Math.min(100, Math.abs(pctv)) + '%';
+    pista.appendChild(b);
+    var v = document.createElement('div');
+    v.className = 'num';
+    v.style.cssText = 'width:46px;text-align:right;font-size:13px';
+    v.textContent = pctv + '%';
+    fila.appendChild(et); fila.appendChild(pista); fila.appendChild(v);
+    tw.appendChild(fila);
+  });
+}
+
+/* Las gráficas guardan el color con el que se dibujaron. Si el sistema
+   cambia de claro a oscuro con la app abierta, se vuelven a pintar. */
+(function () {
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  var alCambiar = function () { if (E) pintar(E); };
+  if (mq.addEventListener) mq.addEventListener('change', alCambiar);
+  else if (mq.addListener) mq.addListener(alCambiar);
+})();
+
+/* ============ jalar para refrescar ============ */
+(function () {
+  var ind = $('jalon');
+  var y0 = 0, activo = false, dy = 0, refrescando = false;
+  var UMBRAL = 62;
+
+  function altura() { return Math.min(96, Math.max(0, dy) * 0.55); }
+
+  document.addEventListener('touchstart', function (ev) {
+    if (refrescando || ev.touches.length !== 1) return;
+    if (!$('app').classList.contains('listo')) return;
+    if (window.scrollY > 0) return;
+    y0 = ev.touches[0].clientY; dy = 0; activo = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (ev) {
+    if (!activo) return;
+    dy = ev.touches[0].clientY - y0;
+    if (dy <= 0 || window.scrollY > 0) { soltar(false); return; }
+    var h = altura();
+    ind.style.transform = 'translateY(' + h + 'px)';
+    ind.style.opacity = Math.min(1, h / 45);
+    ind.classList.toggle('suelta', h >= UMBRAL * 0.55);
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    if (!activo) return;
+    soltar(altura() >= UMBRAL * 0.55);
+  });
+
+  function soltar(refrescar) {
+    activo = false;
+    if (!refrescar) { descansar(); return; }
+    refrescando = true;
+    ind.classList.add('girando');
+    ind.style.transform = 'translateY(58px)';
+    ind.style.opacity = '1';
+    llamar('estado', {}, function (r) {
+      if (r && r.ok) pintar(r);
+      refrescando = false; descansar();
+    }, function () { refrescando = false; descansar(); });
+  }
+
+  function descansar() {
+    ind.style.transform = '';
+    ind.style.opacity = '';
+    ind.classList.remove('suelta', 'girando');
+  }
+})();
+
+/* ============ inicio ============ */
+(function () {
+  var t = leeToken();
+  if (!t) { modo(false); return; }
+  TOKEN = t;
+  $('puerta').innerHTML = '<div class="cargando">Cargando tus números…</div>';
+  llamar('estado', {}, function (r) {
+    if (r && r.ok) { arrancar(r); return; }
+    borraToken(); location.reload();
+  }, function () {
+    $('puerta').innerHTML = '<div class="cargando">' + (FALTA_API ? SIN_API : 'No se pudo conectar.<br>Revisa tu internet y vuelve a abrir.') + '</div>';
+  });
+})();
+</script>
+</body>
+</html>

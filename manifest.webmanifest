@@ -1,0 +1,17 @@
+{
+  "name": "Where's my money?",
+  "short_name": "WMM?",
+  "description": "Registra tus gastos en tres toques y mira a dónde se te va el dinero.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1B211C",
+  "theme_color": "#7CB140",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "iconos/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
