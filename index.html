@@ -22,7 +22,7 @@
     --accent:#54782B; --accent-ink:#476823; --accent-soft:#EAF3DC;
     --seg-track:#E4EBDA; --seg-on:#FFFFFF;
     --warn:#8E5C0D; --warn-soft:#F7EDDA; --danger:#A83A2C;
-    --c-nec:#2a78d6; --c-oci:#1baf7a; --c-inn:#4a3aa7; --c-hor:#eb6834;
+    --c-nec:#2a78d6; --c-hor:#eb6834; --c-oci:#1baf7a; --c-com:#b715a2; --c-otr:#6e6e66;
     --c-in:#1baf7a; --c-out:#eb6834; --c-ref:#8a8a85; --bar-alta:#C07A10;
     --r:14px;
   }
@@ -33,7 +33,7 @@
       --accent:#A1CC71; --accent-ink:#B5D98D; --accent-soft:#273219;
       --seg-track:#1E2520; --seg-on:#3A443B;
       --warn:#D6A44F; --warn-soft:#2E2718; --danger:#E28271;
-      --c-nec:#3987e5; --c-oci:#199e70; --c-inn:#9085e9; --c-hor:#d95926;
+      --c-nec:#3987e5; --c-hor:#d95926; --c-oci:#199e70; --c-com:#c52aae; --c-otr:#a7b0a3;
       --c-in:#199e70; --c-out:#d95926; --c-ref:#8b978a; --bar-alta:#D6A44F;
     }
   }
@@ -206,6 +206,23 @@
   details.grupo summary::-webkit-details-marker { display:none; }
   details.grupo summary::after { content:"›"; color:var(--muted); font-size:19px; transition:transform .15s; }
   details.grupo[open] summary::after { transform:rotate(90deg); }
+  /* ---------- apartados por mes ---------- */
+  details.mes { border:1px solid var(--line); border-radius:var(--r); background:var(--surface); margin-bottom:10px; overflow:hidden; }
+  details.mes > summary {
+    cursor:pointer; list-style:none; padding:14px 16px;
+    display:flex; align-items:center; gap:10px;
+  }
+  details.mes > summary::-webkit-details-marker { display:none; }
+  details.mes > summary::after { content:"›"; color:var(--muted); font-size:20px; line-height:1; transition:transform .15s; margin-left:2px; }
+  details.mes[open] > summary::after { transform:rotate(90deg); }
+  details.mes .titmes { flex:1; min-width:0; }
+  details.mes .titmes b { display:block; font-size:15.5px; font-weight:700; letter-spacing:-.01em; }
+  details.mes .titmes b::first-letter { text-transform:uppercase; }
+  details.mes .titmes span { display:block; font-size:12px; color:var(--muted); margin-top:1px; }
+  details.mes .saldo { font-size:14px; font-weight:700; white-space:nowrap; }
+  details.mes .cuerpo { padding:0 16px 14px; border-top:1px solid var(--line); }
+  details.mes .cuerpo > .titulo-sec { margin-top:16px; }
+
   .pista { margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .pista i { font-style:normal; background:var(--surface-2); border-radius:4px; padding:1px 5px; color:var(--ink); }
   button.chico { width:100%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:11px; padding:11px; font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; margin-bottom:12px; }
@@ -399,10 +416,7 @@
 
   <!-- ============ MOVIMIENTOS ============ -->
   <section class="pantalla" id="p-movimientos">
-    <div class="tarjeta">
-      <div class="titulo-sec">Todo lo que has registrado</div>
-      <div class="lista" id="recientes"></div>
-    </div>
+    <div id="mesesMovs"></div>
   </section>
 
   <!-- ============ HISTORIA ============ -->
@@ -429,6 +443,9 @@
       <div class="titulo-sec">Cuánto logras no gastar</div>
       <div id="tasaWrap"></div>
     </div>
+
+    <div class="titulo-sec" style="margin:22px 0 10px">Mes por mes</div>
+    <div id="mesesHist"></div>
   </section>
 
   <!-- ============ COMPARTIR ============ -->
@@ -489,7 +506,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 7 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 9 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -556,7 +573,12 @@ var E = null;              // último estado recibido
 var tipo = 'Gasto';
 var metodoSel = 'Tarjeta';
 var claseSel = '';
-var COLOR = { 'Necesario':'--c-nec', 'Ocio':'--c-oci', 'Innecesario':'--c-inn', 'Hormiga':'--c-hor' };
+var COLOR = {
+  'Necesario':'--c-nec', 'Hormiga y antojos':'--c-hor', 'Ocio y vida social':'--c-oci',
+  'Compras personales':'--c-com', 'Otros':'--c-otr',
+  // Nombres de antes: siguen teniendo color en los meses viejos.
+  'Ocio':'--c-oci', 'Hormiga':'--c-hor', 'Innecesario':'--c-ref'
+};
 
 function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 function colorCat(c) { return css(COLOR[c] || '--c-ref'); }
@@ -865,9 +887,12 @@ function pintar(estado) {
   pintaFlujo(r);
   dibujaDias(estado.diaSemana);
   pintaTop(estado.topGastos);
-  pintaRecientes(estado.recientes);
+  pintaMesesMovs(estado.mesesMovs);
   dibujaHistoria(estado.meses);
-  var ahorro = estado.meses.length ? estado.meses[estado.meses.length - 1].acumulado : 0;
+  pintaMesesHist(estado.meses);
+  // En "El mes" el ahorro es el de este mes. El acumulado de siempre vive
+  // en Historia, que es donde tiene sentido compararlo.
+  var ahorro = r.balance;
   $('banEntro').textContent = pesos(r.ingresos);
   $('banSalio').textContent = pesos(r.gastos);
   $('banAhorro').textContent = pesos(ahorro);
@@ -952,15 +977,27 @@ $('btnNuevoToken').addEventListener('click', function () {
 
 /* ---------- dona de categorías ---------- */
 function dibujaDona(estado) {
-  var cats = estado.categorias.map(function (c) {
-    return { nombre:c, valor: estado.resumen.porCategoria[c] || 0, color: colorCat(c) };
+  dibujaDonaEn($('donaWrap'), $('donaLeyenda'), estado.resumen.porCategoria,
+               estado.categorias, 'Todavía no hay gastos este mes.');
+}
+
+// La misma dona, pero dibujada donde se le diga. Así sirve para el mes
+// actual y para cada mes viejo de Historia.
+function dibujaDonaEn(wrap, ley, porCategoria, nombres, vacio) {
+  // Primero las categorías de hoy, en su orden; después las que ya no están
+  // en la lista pero tienen gastos de antes, para que la suma no mienta.
+  var lista = (nombres || []).slice();
+  Object.keys(porCategoria || {}).forEach(function (c) {
+    if (lista.indexOf(c) === -1 && porCategoria[c] > 0) lista.push(c);
+  });
+  var cats = lista.map(function (c) {
+    return { nombre:c, valor: (porCategoria && porCategoria[c]) || 0, color: colorCat(c) };
   });
   var total = cats.reduce(function (s, c) { return s + c.valor; }, 0);
-  var wrap = $('donaWrap'), ley = $('donaLeyenda');
   wrap.innerHTML = ''; ley.innerHTML = '';
 
   if (total <= 0) {
-    wrap.innerHTML = '<div class="vacio">Todavía no hay gastos este mes.</div>';
+    wrap.innerHTML = '<div class="vacio">' + (vacio || 'Sin gastos.') + '</div>';
     return;
   }
 
@@ -1018,8 +1055,9 @@ function dibujaDona(estado) {
 }
 
 /* ---------- tarjeta vs efectivo ---------- */
-function pintaFlujo(r) {
-  var f = $('flujo');
+function pintaFlujo(r) { pintaFlujoEn($('flujo'), r); }
+
+function pintaFlujoEn(f, r) {
   f.innerHTML = '';
   var filas = [
     ['Gastos con tarjeta', r.tarjeta, css('--c-out')],
@@ -1087,10 +1125,99 @@ function pintaTop(top) {
   });
 }
 
+/* ---------- apartados por mes ---------- */
+// Qué meses dejó abiertos la persona. Al repintar (al registrar algo, al
+// refrescar o al cambiar de tema) se vuelven a abrir los mismos.
+var ABIERTOS = {};
+var PRIMERPINTADO = true;
+
+function cajaMes(clave, titulo, subtitulo, saldo, abiertoPorDefecto) {
+  var d = document.createElement('details');
+  d.className = 'mes';
+  if (ABIERTOS[clave] === undefined ? abiertoPorDefecto : ABIERTOS[clave]) d.open = true;
+  d.addEventListener('toggle', function () { ABIERTOS[clave] = d.open; });
+
+  var s = document.createElement('summary');
+  s.innerHTML = '<div class="titmes"><b></b><span></span></div><div class="saldo num"></div>';
+  s.querySelector('b').textContent = titulo;
+  s.querySelector('span').textContent = subtitulo;
+  var sal = s.querySelector('.saldo');
+  sal.textContent = (saldo >= 0 ? '+' : '−') + pesos(Math.abs(saldo)).replace('-', '');
+  sal.style.color = saldo >= 0 ? css('--c-in') : css('--c-out');
+  d.appendChild(s);
+
+  var cuerpo = document.createElement('div');
+  cuerpo.className = 'cuerpo';
+  d.appendChild(cuerpo);
+  d.cuerpo = cuerpo;
+  return d;
+}
+
+function pintaMesesMovs(grupos) {
+  var c = $('mesesMovs');
+  c.innerHTML = '';
+  if (!grupos || !grupos.length) {
+    c.innerHTML = '<div class="tarjeta"><div class="vacio">Nada registrado todavía.</div></div>';
+    return;
+  }
+  grupos.forEach(function (g, i) {
+    var sub = g.cuantos + (g.cuantos === 1 ? ' mov' : ' movs') +
+              ' · entró ' + pesos(g.ingresos) + ' · salió ' + pesos(g.gastos);
+    var caja = cajaMes('mov-' + g.clave, g.nombre, sub, g.ingresos - g.gastos, i === 0);
+    var lista = document.createElement('div');
+    lista.className = 'lista';
+    pintaLista(lista, g.movimientos);
+    caja.cuerpo.appendChild(lista);
+    c.appendChild(caja);
+  });
+}
+
+function pintaMesesHist(meses) {
+  var c = $('mesesHist');
+  c.innerHTML = '';
+  var conDatos = (meses || []).filter(function (m) { return m.ingresos > 0 || m.gastos > 0; })
+                              .slice().reverse();
+  if (!conDatos.length) {
+    c.innerHTML = '<div class="tarjeta"><div class="vacio">Todavía no hay meses que mostrar.</div></div>';
+    return;
+  }
+  conDatos.forEach(function (m, i) {
+    var sub = pesos(m.gastos) + ' gastado · ' + pesos(m.ingresos) + ' recibido';
+    var caja = cajaMes('hist-' + m.clave, m.nombre || m.etiqueta, sub, m.balance, i === 0);
+
+    var t1 = document.createElement('div');
+    t1.className = 'titulo-sec';
+    t1.textContent = 'En qué se te fue';
+    var donaW = document.createElement('div');
+    var donaL = document.createElement('div');
+    donaL.className = 'leyenda';
+    caja.cuerpo.appendChild(t1);
+    caja.cuerpo.appendChild(donaW);
+    caja.cuerpo.appendChild(donaL);
+    dibujaDonaEn(donaW, donaL, m.categorias, E ? E.categorias : [], 'Sin gastos este mes.');
+
+    var t2 = document.createElement('div');
+    t2.className = 'titulo-sec';
+    t2.textContent = 'Entradas y salidas';
+    var flujo = document.createElement('div');
+    flujo.className = 'leyenda';
+    caja.cuerpo.appendChild(t2);
+    caja.cuerpo.appendChild(flujo);
+    pintaFlujoEn(flujo, m);
+
+    c.appendChild(caja);
+  });
+}
+
 function pintaRecientes(movs) {
   var l = $('recientes');
+  if (!l) return;
+  pintaLista(l, movs);
+}
+
+function pintaLista(l, movs) {
   l.innerHTML = '';
-  if (!movs.length) { l.innerHTML = '<div class="vacio">Nada registrado todavía.</div>'; return; }
+  if (!movs || !movs.length) { l.innerHTML = '<div class="vacio">Nada registrado todavía.</div>'; return; }
   movs.forEach(function (m) {
     var d = document.createElement('div');
     d.className = 'item';
