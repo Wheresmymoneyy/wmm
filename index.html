@@ -240,7 +240,43 @@
   #jalon.girando svg { animation:vuelta .9s linear infinite; }
   @keyframes vuelta { to { transform:rotate(360deg); } }
 
-  .cargando { color:var(--muted); font-size:14.5px; text-align:center; padding:40px 0; }
+  /* Ocupa todo el alto de la pantalla de entrada y se queda en el centro. */
+  .cargando {
+    color:var(--muted); font-size:14.5px; text-align:center;
+    min-height:100%; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:0 0 12px;
+  }
+
+  /* ---------- el cochinito tragándose la moneda ---------- */
+  .cochi { position:relative; width:150px; height:150px; margin:0 auto 14px; }
+  .cochi img { position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  /* La moneda va DEBAJO del cochinito, que lleva su hueco recortado. Por eso
+     solo puede bajar: si subiera destaparía el hueco sobre el lomo. */
+  .cochi .moneda { animation:tragar 2.7s cubic-bezier(.4,0,.75,.5) infinite; }
+  @keyframes tragar {
+    0%, 16%   { transform:translateY(0);     opacity:1; }
+    22%       { transform:translateY(-1.1%); opacity:1; }
+    46%       { transform:translateY(11%);   opacity:1; }
+    48%       { transform:translateY(12%);   opacity:0; }
+    74%       { transform:translateY(0);     opacity:0; }
+    88%, 100% { transform:translateY(0);     opacity:1; }
+  }
+  .cochi .cerdo { animation:asentar 2.7s cubic-bezier(.33,.7,.4,1) infinite; transform-origin:50% 92%; }
+  @keyframes asentar {
+    0%, 42%   { transform:translateY(0) scaleY(1); }
+    49%       { transform:translateY(1.4%) scaleY(.975); }
+    60%, 100% { transform:translateY(0) scaleY(1); }
+  }
+  /* los tres puntos, en su propio ritmo */
+  .cargando .frase i { font-style:normal; animation:punto 1.35s ease-in-out infinite; opacity:.25; }
+  .cargando .frase i:nth-of-type(2) { animation-delay:.18s; }
+  .cargando .frase i:nth-of-type(3) { animation-delay:.36s; }
+  @keyframes punto { 0%, 60%, 100% { opacity:.25; } 25% { opacity:1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cochi img, .cargando i { animation:none !important; opacity:1; }
+  }
 
   .dato-copiar { display:flex; align-items:center; gap:10px; background:var(--surface-2); border-radius:11px; padding:11px 13px; }
   .dato-copiar code { flex:1; min-width:0; font-size:16px; font-weight:600; word-break:break-all; font-family:ui-monospace,"SF Mono",Menlo,monospace; }
@@ -506,7 +542,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 9 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 10 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -660,7 +696,7 @@ function intentar() {
     if (!r || !r.ok) { error((r && r.mensaje) || 'No se pudo.'); return; }
     TOKEN = r.token; USUARIO = r.usuario;
     guardaToken(r.token);
-    $('puerta').innerHTML = '<div class="cargando">Cargando tus números…</div>';
+    $('puerta').innerHTML = "<div class='cargando'><div class='cochi' role='img' aria-label='Ahorrando'><img class='signos' src='iconos/carga-signos.png' alt=''><img class='moneda' src='iconos/carga-moneda.png' alt=''><img class='cerdo' src='iconos/carga-cerdo.png' alt=''></div><span class='frase'>Ahorrando<i>.</i><i>.</i><i>.</i></span></div>";
     llamar('estado', {}, function (e) {
       if (e && e.ok) arrancar(e); else error('Entraste, pero no cargaron tus datos.');
     });
@@ -1422,7 +1458,7 @@ function dibujaHistoria(meses) {
   var t = leeToken();
   if (!t) { modo(false); return; }
   TOKEN = t;
-  $('puerta').innerHTML = '<div class="cargando">Cargando tus números…</div>';
+  $('puerta').innerHTML = "<div class='cargando'><div class='cochi' role='img' aria-label='Ahorrando'><img class='signos' src='iconos/carga-signos.png' alt=''><img class='moneda' src='iconos/carga-moneda.png' alt=''><img class='cerdo' src='iconos/carga-cerdo.png' alt=''></div><span class='frase'>Ahorrando<i>.</i><i>.</i><i>.</i></span></div>";
   llamar('estado', {}, function (r) {
     if (r && r.ok) { arrancar(r); return; }
     borraToken(); location.reload();
