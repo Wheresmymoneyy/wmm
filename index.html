@@ -197,7 +197,20 @@
   dialog::backdrop { background:rgba(0,0,0,.45); }
   dialog .cuerpo { padding:18px; }
   /* los campos de fecha se encogen solos si no se les dice que no */
-  input[type=date] { width:100%; min-height:46px; font-family:inherit; }
+  /* El campo de fecha: se ve el día en grande y el input va encima,
+     invisible, para que toda la tarjeta sea el área que se toca. */
+  .campo-fecha {
+    position:relative; display:block; border:1px solid var(--line);
+    background:var(--surface-2); border-radius:12px; padding:12px 14px; margin-bottom:14px;
+  }
+  .campo-fecha .et { display:block; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+  .campo-fecha .dia { display:block; font-size:18px; font-weight:700; margin-top:3px; }
+  .campo-fecha .toca { display:block; font-size:12.5px; color:var(--accent); margin-top:4px; }
+  .campo-fecha input[type=date] {
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0; border:0; background:none; font-family:inherit;
+  }
+  .fila-btn button:disabled { opacity:.45; }
   dialog h2 { font-size:17px; margin:0 0 14px; }
   .fila-btn { display:flex; gap:9px; margin-top:6px; }
   .fila-btn button { flex:1; border-radius:11px; padding:12px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); }
@@ -545,7 +558,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 16 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 17 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -570,18 +583,25 @@
 </div>
 
 <dialog id="dlgFecha">
-  <div class="cuerpo">
+  <!-- El autofocus va aquí a propósito: showModal() enfoca el primer elemento
+       que encuentra, y si eso es el campo de fecha, el iPhone abre la rueda
+       del calendario sin que nadie se lo pida. -->
+  <div class="cuerpo" tabindex="-1" autofocus>
     <h2>Corregir la fecha</h2>
-    <p class="pista" id="fechaQue" style="margin-bottom:14px"></p>
-    <div class="campo">
-      <label for="fechaNueva">¿Qué día fue?</label>
+    <p class="pista" id="fechaQue" style="margin-bottom:16px"></p>
+
+    <label class="campo-fecha" for="fechaNueva">
+      <span class="et">Quedaría en</span>
+      <span class="dia" id="fechaLeible">—</span>
+      <span class="toca">Toca para elegir otro día</span>
       <input type="date" id="fechaNueva">
-    </div>
+    </label>
+
     <p class="pista">Si lo mueves a otro mes, los totales de los dos meses cambian. Para corregir el monto o el concepto, bórralo y vuélvelo a registrar.</p>
     <div id="errFecha" class="aviso mal" style="display:none;margin-bottom:12px"></div>
     <div class="fila-btn">
       <button id="cerrarFecha">Cancelar</button>
-      <button class="pri" id="guardarFecha">Guardar</button>
+      <button class="pri" id="guardarFecha" disabled>Guardar</button>
     </div>
   </div>
 </dialog>
@@ -1310,17 +1330,39 @@ function pintaLista(l, movs) {
 /* ---------- corregir la fecha de un movimiento ---------- */
 var ENEDICION = null;
 
+var MESES_TXT = ['enero','febrero','marzo','abril','mayo','junio',
+                'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function diaLeible(iso) {
+  var p = String(iso || '').split('-');
+  if (p.length !== 3) return '—';
+  return Number(p[2]) + ' de ' + MESES_TXT[Number(p[1]) - 1] + ' de ' + p[0];
+}
+
 function abreFecha(m) {
   ENEDICION = m;
-  $('fechaQue').textContent = m.concepto + ' · ' + pesos(m.monto) + ' · ahora está en el ' + m.cuando;
+  $('fechaQue').textContent = m.concepto + ' · ' + pesos(m.monto) + ' · hoy está en el ' + m.cuando;
   var i = $('fechaNueva');
   i.value = m.iso || '';
   i.max = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $('fechaLeible').textContent = diaLeible(i.value);
+  $('guardarFecha').disabled = true;     // nada que guardar hasta que cambie
   $('errFecha').style.display = 'none';
   $('dlgFecha').showModal();
 }
 
+// Mientras no elija otro día, Guardar no hace nada y se ve apagado.
+$('fechaNueva').addEventListener('change', function () {
+  $('fechaLeible').textContent = diaLeible(this.value);
+  $('guardarFecha').disabled = !this.value || !ENEDICION || this.value === ENEDICION.iso;
+});
+
 $('cerrarFecha').addEventListener('click', function () { $('dlgFecha').close(); });
+
+// Tocar fuera de la ventana también la cierra: si entraste por error, sales igual de fácil.
+$('dlgFecha').addEventListener('click', function (ev) {
+  if (ev.target === this) this.close();
+});
 
 $('guardarFecha').addEventListener('click', function () {
   if (!ENEDICION) return;
@@ -1330,8 +1372,9 @@ $('guardarFecha').addEventListener('click', function () {
   var b = $('guardarFecha');
   b.disabled = true; b.textContent = 'Guardando…';
   llamar('fecha', { fila: ENEDICION.fila, fecha: v, sello_concepto: ENEDICION.concepto, sello_monto: ENEDICION.monto }, function (r) {
-    b.disabled = false; b.textContent = 'Guardar';
+    b.textContent = 'Guardar';
     if (!r || !r.ok) {
+      b.disabled = false;
       $('errFecha').textContent = (r && r.mensaje) || 'No se pudo.';
       $('errFecha').style.display = 'block';
       return;
