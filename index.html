@@ -216,12 +216,41 @@
   .fila-btn button { flex:1; border-radius:11px; padding:12px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); }
   .fila-btn button.pri { background:var(--marca); color:var(--sobre-marca); border-color:var(--marca); }
 
-  details.grupo { border-bottom:1px solid var(--line); padding:4px 0; }
-  details.grupo:last-of-type { border-bottom:0; }
-  details.grupo summary { cursor:pointer; font-size:15px; font-weight:600; padding:11px 0; list-style:none; display:flex; justify-content:space-between; align-items:center; }
-  details.grupo summary::-webkit-details-marker { display:none; }
-  details.grupo summary::after { content:"›"; color:var(--muted); font-size:19px; transition:transform .15s; }
-  details.grupo[open] summary::after { transform:rotate(90deg); }
+  /* ---------- apartados de Ajustes: cada uno es una tarjeta que se toca ---------- */
+  /* OJO: el recuadro azul que salía era el aro de foco de Safari sobre el
+     <summary>, porque showModal() enfoca el primer elemento enfocable.
+     Se quita con outline:none aquí + autofocus/tabindex="-1" en .cuerpo. */
+  .grupo {
+    border:1px solid var(--line); border-radius:12px; background:var(--surface);
+    margin-bottom:9px; overflow:hidden;
+    transition:background .15s, border-color .15s;
+  }
+  .grupo > summary, .fila-grupo {
+    cursor:pointer; font-size:15px; font-weight:600; color:var(--ink);
+    padding:13px 14px; list-style:none;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    outline:none; -webkit-user-select:none; user-select:none;
+  }
+  .grupo > summary::-webkit-details-marker { display:none; }
+  .grupo > summary::after, .fila-grupo::after {
+    content:"›"; color:var(--muted); font-size:19px; line-height:1;
+    transition:transform .18s, color .18s;
+  }
+  .grupo > summary:active, .fila-grupo:active { background:var(--surface-2); }
+  .grupo[open] { background:var(--surface-2); border-color:var(--accent); }
+  .grupo[open] > summary { color:var(--accent-ink); }
+  .grupo[open] > summary::after { transform:rotate(90deg); color:var(--accent); }
+  .grupo > summary:focus-visible, .fila-grupo:focus-visible {
+    box-shadow:inset 0 0 0 2px var(--accent);
+  }
+  .grupo .dentro { padding:2px 14px 14px; }
+  .grupo .dentro > button.chico:last-child { margin-bottom:0; }
+  /* una fila que no despliega nada, sólo lleva a otra ventana */
+  .fila-grupo {
+    width:100%; text-align:left; font-family:inherit;
+    border:1px solid var(--line); border-radius:12px; background:var(--surface);
+    margin-bottom:9px;
+  }
   /* ---------- apartados por mes ---------- */
   details.mes { border:1px solid var(--line); border-radius:var(--r); background:var(--surface); margin-bottom:10px; overflow:hidden; }
   details.mes > summary {
@@ -298,6 +327,12 @@
   .dato-copiar code { flex:1; min-width:0; font-size:16px; font-weight:600; word-break:break-all; font-family:ui-monospace,"SF Mono",Menlo,monospace; }
   button.mini { flex:none; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:9px; padding:7px 12px; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
   button.mini.hecho { background:var(--marca); border-color:var(--marca); color:var(--sobre-marca); }
+  /* En Mis tarjetas el renglón ya lleva nombre, estado, monto y la ✕: un
+     botón más al lado deja el nombre en "BBVA O…". Va debajo, a lo ancho. */
+  .tj .item { border-bottom:0; padding-bottom:4px; }
+  .tj { border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .tj:last-child { border-bottom:0; }
+  button.mini.ancho { display:block; width:100%; padding:9px; margin-top:2px; }
 
   .atajo { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
   .atajo:last-child { border-bottom:0; }
@@ -405,6 +440,13 @@
         <label id="lblMetodo">Cómo pagaste</label>
         <div class="chips" id="chipsMetodo"></div>
       </div>
+      <div class="campo" id="campoTarjeta" style="display:none">
+        <label>Con cuál tarjeta</label>
+        <div class="chips" id="chipsTarjeta"></div>
+        <p class="pista" id="pistaTarjeta" style="display:none;margin:9px 0 0">
+          ¿Pagas con crédito? Agrega tus tarjetas en <b>Cuenta → Ajustes → Mis tarjetas</b> y aquí te van a salir.
+        </p>
+      </div>
       <div class="campo" style="margin-bottom:4px">
         <label id="lblClase">Qué tipo de gasto fue</label>
         <div class="chips" id="chipsClase"></div>
@@ -441,6 +483,21 @@
         <div><div class="et">Por día</div><div class="va num" id="mesDiario">—</div></div>
       </div>
       <div class="aviso ok" id="mesAlerta" style="display:none;margin:12px 0 0"></div>
+    </div>
+
+    <div class="tarjeta" id="tarjetaFijos" style="display:none">
+      <div class="titulo-sec">Gastos fijos</div>
+      <div class="lista" id="listaFijosMes"></div>
+      <div class="dosdatos" style="margin-top:12px">
+        <div><div class="et">Falta por caer</div><div class="va num" id="fijoFalta">—</div></div>
+        <div><div class="et">Ya cayó</div><div class="va num" id="fijoCayo">—</div></div>
+      </div>
+    </div>
+
+    <div class="tarjeta" id="tarjetaCredito" style="display:none">
+      <div class="titulo-sec">Por pagar de tus tarjetas</div>
+      <div class="lista" id="listaCreditoMes"></div>
+      <p class="pista" style="margin:12px 0 0">Es todo lo que has gastado con cada tarjeta menos lo que ya pagaste. Cuando pagues, dale <b>Ya la pagué</b> y vuelve a cero.</p>
     </div>
 
     <div class="tarjeta">
@@ -558,7 +615,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 17 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 19 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -582,12 +639,88 @@
   </nav>
 </div>
 
+<dialog id="dlgFijos">
+  <div class="cuerpo" tabindex="-1" autofocus>
+    <h2>Gastos fijos</h2>
+    <p class="pista">Lo que pagas cada mes: suscripciones, renta, gimnasio. No se registran solos — la app te dice cuáles faltan y los registras de un toque el día que caen.</p>
+    <div class="lista" id="listaFijos"></div>
+    <button class="chico pri" id="nuevoFijo" style="margin-top:14px">Agregar un gasto fijo</button>
+    <div class="fila-btn">
+      <button id="cerrarFijos">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgTarjetas">
+  <div class="cuerpo" tabindex="-1" autofocus>
+    <h2>Mis tarjetas</h2>
+    <p class="pista">Solo las de crédito, que son las que dejan deuda. El débito no hace falta: ya es una opción al registrar.</p>
+    <p class="pista" id="pistaDefecto" style="display:none">Cuando registras desde el atajo solo dices <b>crédito</b>, sin decir cuál. Marca aquí la que usas a diario y el atajo la va a asumir; las demás se eligen a mano en la app.</p>
+    <div class="lista" id="listaTarjetas"></div>
+    <button class="chico pri" id="nuevaTarjeta" style="margin-top:14px">Agregar una tarjeta</button>
+    <div class="fila-btn">
+      <button id="cerrarTarjetas">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgTarjeta">
+  <div class="cuerpo" tabindex="-1" autofocus>
+    <h2 id="tituloTarjeta">Nueva tarjeta</h2>
+    <div class="campo">
+      <label for="tarjetaNombre">¿Cómo le dices?</label>
+      <input type="text" id="tarjetaNombre" placeholder="BBVA Oro, Amex, Nu…" autocomplete="off">
+    </div>
+    <p class="pista">Ponle el nombre con el que la reconozcas de un vistazo. No guardes el número: aquí no hace falta y no debe andar escrito.</p>
+    <div id="errTarjeta" class="aviso mal" style="display:none;margin-bottom:12px"></div>
+    <div class="fila-btn">
+      <button id="cerrarTarjeta">Cancelar</button>
+      <button class="pri" id="guardarTarjeta">Guardar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgFijo">
+  <div class="cuerpo" tabindex="-1" autofocus>
+    <h2 id="tituloFijo">Nuevo gasto fijo</h2>
+    <div class="campo">
+      <label for="fijoNombre">¿Qué es?</label>
+      <input type="text" id="fijoNombre" placeholder="Netflix, renta, gimnasio…">
+    </div>
+    <div class="campo">
+      <label for="fijoMonto">¿Cuánto?</label>
+      <input type="number" id="fijoMonto" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="campo">
+      <label for="fijoDia">¿Qué día del mes cae?</label>
+      <input type="number" id="fijoDia" inputmode="numeric" min="1" max="31" placeholder="5">
+    </div>
+    <div class="campo">
+      <label>Cómo lo pagas</label>
+      <div class="chips" id="fijoMetodo"></div>
+    </div>
+    <div class="campo" id="campoFijoTarjeta" style="display:none">
+      <label>Con cuál tarjeta</label>
+      <div class="chips" id="fijoTarjeta"></div>
+    </div>
+    <div class="campo">
+      <label>Qué tipo de gasto es</label>
+      <div class="chips" id="fijoCat"></div>
+    </div>
+    <div id="errFijo" class="aviso mal" style="display:none;margin-bottom:12px"></div>
+    <div class="fila-btn">
+      <button id="cerrarFijo">Cancelar</button>
+      <button class="pri" id="guardarFijo">Guardar</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlgFecha">
   <!-- El autofocus va aquí a propósito: showModal() enfoca el primer elemento
        que encuentra, y si eso es el campo de fecha, el iPhone abre la rueda
        del calendario sin que nadie se lo pida. -->
   <div class="cuerpo" tabindex="-1" autofocus>
-    <h2>Corregir la fecha</h2>
+    <h2 id="tituloCorregir">Corregir la fecha</h2>
     <p class="pista" id="fechaQue" style="margin-bottom:16px"></p>
 
     <label class="campo-fecha" for="fechaNueva">
@@ -596,6 +729,11 @@
       <span class="toca">Toca para elegir otro día</span>
       <input type="date" id="fechaNueva">
     </label>
+
+    <div class="campo" id="campoCorrigeTarjeta" style="display:none">
+      <label>Con cuál tarjeta</label>
+      <div class="chips" id="chipsCorrigeTarjeta"></div>
+    </div>
 
     <p class="pista">Si lo mueves a otro mes, los totales de los dos meses cambian. Para corregir el monto o el concepto, bórralo y vuélvelo a registrar.</p>
     <div id="errFecha" class="aviso mal" style="display:none;margin-bottom:12px"></div>
@@ -607,31 +745,40 @@
 </dialog>
 
 <dialog id="dlgCfg">
-  <div class="cuerpo">
+  <div class="cuerpo" autofocus tabindex="-1">
     <h2>Ajustes</h2>
     <details class="grupo">
       <summary>Mi nombre de usuario</summary>
-      <div class="campo" style="margin-top:10px">
-        <input type="text" id="nuevoUsuario" autocapitalize="none" spellcheck="false" placeholder="cómo te quieres llamar">
+      <div class="dentro">
+        <div class="campo" style="margin-top:4px">
+          <input type="text" id="nuevoUsuario" autocapitalize="none" spellcheck="false" placeholder="cómo te quieres llamar">
+        </div>
+        <p class="pista">Se guarda en minúsculas y sin acentos. Los espacios se vuelven punto: <i>Cristóbal Navarro</i> queda como <i>cristobal.navarro</i>. Tus movimientos se van contigo.</p>
+        <button class="chico pri" id="guardarUsuario">Cambiar mi usuario</button>
       </div>
-      <p class="pista">Se guarda en minúsculas y sin acentos. Los espacios se vuelven punto: <i>Cristóbal Navarro</i> queda como <i>cristobal.navarro</i>. Tus movimientos se van contigo.</p>
-      <button class="chico pri" id="guardarUsuario">Cambiar mi usuario</button>
     </details>
 
     <details class="grupo">
       <summary>Límite de gasto del mes</summary>
-      <div class="campo" style="margin-top:10px">
-        <input type="number" id="nuevoLimite" inputmode="decimal">
+      <div class="dentro">
+        <div class="campo" style="margin-top:4px">
+          <input type="number" id="nuevoLimite" inputmode="decimal">
+        </div>
+        <p class="pista">Es tu tope mensual. La app te avisa al 75%, al 90% y cuando te pasas.</p>
+        <button class="chico pri" id="guardarLimite">Guardar límite</button>
       </div>
-      <p class="pista">Es tu tope mensual. La app te avisa al 75%, al 90% y cuando te pasas.</p>
-      <button class="chico pri" id="guardarLimite">Guardar límite</button>
     </details>
 
     <details class="grupo">
       <summary>Mi clave</summary>
-      <p class="pista" style="margin-top:10px">Es con la que entras a la app. Para cambiarla te va a pedir primero la de ahora.</p>
-      <button class="chico" id="btnCambiarClave2">Cambiar mi clave</button>
+      <div class="dentro">
+        <p class="pista" style="margin-top:4px">Es con la que entras a la app. Para cambiarla te va a pedir primero la de ahora.</p>
+        <button class="chico" id="btnCambiarClave2">Cambiar mi clave</button>
+      </div>
     </details>
+
+    <button class="fila-grupo" id="abrirFijos">Mis gastos fijos</button>
+    <button class="fila-grupo" id="abrirTarjetas">Mis tarjetas</button>
 
     <div class="fila-btn" style="margin-top:16px">
       <button id="cerrarCfg">Cerrar</button>
@@ -648,6 +795,7 @@ var modoCrear = false;
 var E = null;              // último estado recibido
 var tipo = 'Gasto';
 var metodoSel = 'Tarjeta';
+var tarjetaSel = 'Débito';
 var claseSel = '';
 var COLOR = {
   'Necesario':'--c-nec', 'Hormiga y antojos':'--c-hor', 'Ocio y vida social':'--c-oci',
@@ -832,6 +980,17 @@ function cambiaTipo(t) {
   pintarChips();
 }
 
+/* Las tarjetas de crédito de la persona, tal como las devuelve el servidor. */
+function misTarjetas() { return (E && E.tarjetas && E.tarjetas.lista) || []; }
+
+/* Cómo se lee el pago en el renglón de un movimiento. Si hay nombre de
+   tarjeta se dice el nombre: "Tarjeta · BBVA" sobra, con "BBVA" se entiende. */
+function comoPago(m) {
+  if (!m.metodo) return '';
+  if (!m.tarjeta) return ' · ' + m.metodo;
+  return ' · ' + (m.tarjeta === 'Débito' ? 'Débito' : m.tarjeta);
+}
+
 function pintarChips() {
   var cm = $('chipsMetodo'); cm.innerHTML = '';
   ['Tarjeta', 'Efectivo'].forEach(function (m) {
@@ -841,6 +1000,24 @@ function pintarChips() {
     b.addEventListener('click', function () { metodoSel = m; pintarChips(); });
     cm.appendChild(b);
   });
+
+  /* Débito y crédito solo tienen sentido si pagaste con tarjeta, y solo en un
+     gasto: un ingreso que cae en la tarjeta no genera deuda. */
+  var conTarjeta = metodoSel === 'Tarjeta' && tipo === 'Gasto';
+  $('campoTarjeta').style.display = conTarjeta ? '' : 'none';
+  if (conTarjeta) {
+    var nombres = ['Débito'].concat(misTarjetas().map(function (t) { return t.nombre; }));
+    if (nombres.indexOf(tarjetaSel) < 0) tarjetaSel = 'Débito';
+    var ct = $('chipsTarjeta'); ct.innerHTML = '';
+    nombres.forEach(function (n) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (tarjetaSel === n ? ' on' : '');
+      b.type = 'button'; b.textContent = n;
+      b.addEventListener('click', function () { tarjetaSel = n; pintarChips(); });
+      ct.appendChild(b);
+    });
+    $('pistaTarjeta').style.display = misTarjetas().length ? 'none' : '';
+  }
 
   var lista = tipo === 'Gasto' ? (E ? E.categorias : []) : (E ? E.fuentes : []);
   if (!claseSel && lista.length) claseSel = lista[0];
@@ -867,6 +1044,7 @@ $('btnGuardar').addEventListener('click', function () {
 
   var datos = { concepto: concepto, monto: monto, metodo: metodoSel };
   if (tipo === 'Gasto') datos.categoria = claseSel; else datos.fuente = claseSel;
+  if (metodoSel === 'Tarjeta' && tipo === 'Gasto') datos.tarjeta = tarjetaSel;
 
   $('btnGuardar').disabled = true;
   $('btnGuardar').textContent = 'Guardando…';
@@ -899,8 +1077,22 @@ function avisar(texto, bien) {
 $('abrirCfg').addEventListener('click', function () {
   $('nuevoLimite').value = E ? E.resumen.limite : '';
   $('nuevoUsuario').value = USUARIO || '';
+  /* siempre se abre con todo cerrado, para que se vea de un golpe qué hay */
+  var g = $('dlgCfg').querySelectorAll('details.grupo');
+  for (var i = 0; i < g.length; i++) g[i].open = false;
   $('dlgCfg').showModal();
 });
+/* sólo uno abierto a la vez: así no se pierde de vista cuál estás tocando */
+(function () {
+  var g = $('dlgCfg').querySelectorAll('details.grupo');
+  for (var i = 0; i < g.length; i++) {
+    g[i].addEventListener('toggle', function () {
+      if (!this.open) return;
+      for (var j = 0; j < g.length; j++) if (g[j] !== this) g[j].open = false;
+    });
+  }
+})();
+$('dlgCfg').addEventListener('click', function (ev) { if (ev.target === this) this.close(); });
 
 $('guardarUsuario').addEventListener('click', function () {
   var n = $('nuevoUsuario').value.trim();
@@ -965,6 +1157,8 @@ function pintar(estado) {
   pintaFlujo(r);
   dibujaDias(estado.diaSemana);
   pintaTop(estado.topGastos);
+  pintaFijosMes(estado.fijos);
+  pintaCreditoMes(estado.tarjetas);
   pintaMesesMovs(estado.mesesMovs);
   dibujaHistoria(estado.meses);
   pintaMesesHist(estado.meses);
@@ -1313,7 +1507,7 @@ function pintaLista(l, movs) {
     var zona = d.querySelector('.txt');
     zona.style.cursor = 'pointer';
     zona.addEventListener('click', function () { abreFecha(m); });
-    d.querySelector('.m').textContent = m.cuando + ' · ' + m.etiqueta + (m.metodo ? ' · ' + m.metodo : '');
+    d.querySelector('.m').textContent = m.cuando + ' · ' + m.etiqueta + comoPago(m);
     var mto = d.querySelector('.mto');
     mto.textContent = (m.tipo === 'Ingreso' ? '+' : '') + pesos(m.monto);
     if (m.tipo === 'Ingreso') mto.classList.add('ing');
@@ -1327,6 +1521,388 @@ function pintaLista(l, movs) {
   });
 }
 
+/* ---------- tarjetas de crédito ---------- */
+
+/* Cómo se explica el saldo en una línea. Ojo: el saldo es todo lo gastado
+   menos todo lo pagado, así que NO se puede decir "N gastos sin pagar" —no
+   se sabe cuáles de los gastos cubrió cada pago, y además con un pago
+   parcial la frase mentiría. */
+function saldoEnPalabras(x) {
+  if (x.saldo < 0) return 'Pagaste de más · tienes ' + pesos(Math.abs(x.saldo)) + ' a favor';
+  if (x.saldo === 0) return x.ultimoPago ? 'Al corriente · pagaste el ' + x.ultimoPago.cuando
+                                         : 'Sin gastos todavía';
+  return 'Por pagar';   // corto a propósito: con tres renglones la tarjeta se desarma
+}
+
+// La tarjeta de Mes: cuánto debes de cada una y el botón para saldarla.
+function pintaCreditoMes(t) {
+  var caja = $('tarjetaCredito'), l = $('listaCreditoMes');
+  var lista = (t && t.lista) ? t.lista : [];
+  var sin = (t && t.sinAsignar) || 0;
+  var cuantosSin = (t && t.movimientosSinAsignar) || 0;
+  // Se vacía SIEMPRE, también al esconderla: si no, los renglones viejos se
+  // quedan en el DOM con botones que apuntan a filas que ya no existen.
+  l.innerHTML = '';
+  if (!lista.length && !cuantosSin) { caja.style.display = 'none'; return; }
+  caja.style.display = '';
+
+  lista.forEach(function (x) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div>';
+    d.querySelector('.bolita').style.background = x.saldo > 0 ? css('--c-out') : css('--c-in');
+    if (!x.saldo) d.querySelector('.bolita').style.opacity = '.45';
+    d.querySelector('.c').textContent = x.nombre;
+    d.querySelector('.m').textContent = saldoEnPalabras(x);
+    d.querySelector('.mto').textContent = pesos(x.saldo);
+    if (x.saldo > 0) {
+      var b = document.createElement('button');
+      b.className = 'mini'; b.textContent = 'Ya la pagué';
+      b.addEventListener('click', function () {
+        if (!confirm('¿Ya pagaste ' + pesos(x.saldo) + ' de ' + x.nombre + '?\n\nQueda en ceros y se guarda el pago. Lo que gastes después se vuelve a sumar.')) return;
+        b.disabled = true; b.textContent = 'Un momento…';
+        llamar('tarjetapago', { fila: x.fila, sello_nombre: x.nombre }, function (r) {
+          if (r && r.ok && r.estado) { pintar(r.estado); return; }
+          b.disabled = false; b.textContent = 'Ya la pagué';
+          // Que no falle en silencio: si el servidor dijo que no, hay que
+          // enseñar por qué, o la persona vuelve a picarle sin entender.
+          alert((r && r.mensaje) || 'No se pudo registrar el pago.');
+        }, function () {
+          b.disabled = false; b.textContent = 'Ya la pagué';
+          alert(FALTA_API ? SIN_API : SIN_RED);
+        });
+      });
+      d.appendChild(b);
+    }
+    l.appendChild(d);
+  });
+
+  /* Lo gastado a crédito que todavía no sabe de cuál tarjeta fue. Va aparte,
+     sin botón de pagar: primero hay que decir con cuál fue. */
+  // Se enseña si hay movimientos pendientes, aunque la suma dé cero: lo que
+  // hay que resolver es que falta decir con cuál tarjeta fueron.
+  if (sin || (t && t.movimientosSinAsignar)) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div>';
+    d.querySelector('.bolita').style.background = css('--warn');
+    d.querySelector('.c').textContent = 'Sin asignar';
+    d.querySelector('.m').textContent = t.movimientosSinAsignar === 1
+      ? '1 gasto a crédito · tócalo en Movs para decir con cuál fue'
+      : t.movimientosSinAsignar + ' gastos a crédito · tócalos en Movs para decir con cuál fueron';
+    d.querySelector('.m').style.color = css('--warn');
+    d.querySelector('.mto').textContent = pesos(sin);
+    l.appendChild(d);
+  }
+}
+
+/* ---------- administrarlas ---------- */
+var TARJETA_EDITA_FILA = null, TARJETA_EDITA_NOMBRE = '';
+
+$('abrirTarjetas').addEventListener('click', function () {
+  $('dlgCfg').close();
+  pintaListaTarjetas();
+  $('dlgTarjetas').showModal();
+});
+$('cerrarTarjetas').addEventListener('click', function () { $('dlgTarjetas').close(); });
+$('dlgTarjetas').addEventListener('click', function (ev) { if (ev.target === this) this.close(); });
+
+function pintaListaTarjetas() {
+  var l = $('listaTarjetas');
+  l.innerHTML = '';
+  var lista = misTarjetas();
+  $('pistaDefecto').style.display = lista.length > 1 ? '' : 'none';
+  if (!lista.length) {
+    l.innerHTML = '<div class="vacio">Todavía no tienes tarjetas de crédito aquí.</div>';
+    return;
+  }
+  lista.forEach(function (x) {
+    var caja = document.createElement('div');
+    caja.className = 'tj';
+
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div><button class="borrar" title="Quitar">&times;</button>';
+    d.querySelector('.bolita').style.background = x.saldo > 0 ? css('--c-out') : css('--c-in');
+    if (!x.saldo) d.querySelector('.bolita').style.opacity = '.45';
+    d.querySelector('.c').textContent = x.nombre;
+    d.querySelector('.m').textContent = x.saldo > 0 ? 'Por pagar' : 'Al corriente';
+    d.querySelector('.mto').textContent = pesos(x.saldo);
+
+    var zona = d.querySelector('.txt');
+    zona.style.cursor = 'pointer';
+    zona.addEventListener('click', function () { abreTarjeta(x); });
+
+    d.querySelector('.borrar').addEventListener('click', function () {
+      if (!confirm('¿Quitar "' + x.nombre + '" de tus tarjetas?\n\nLos gastos que hiciste con ella se quedan como están.')) return;
+      llamar('tarjetaborrar', { fila: x.fila, sello_nombre: x.nombre }, function (r) {
+        if (r && r.ok && r.estado) { pintar(r.estado); pintaListaTarjetas(); }
+        else alert((r && r.mensaje) || 'No se pudo.');
+      }, function () { alert(FALTA_API ? SIN_API : SIN_RED); });
+    });
+    caja.appendChild(d);
+
+    /* Con una sola tarjeta el botón sobra: todo lo de crédito va ahí de
+       todos modos, no hay nada que elegir. */
+    if (lista.length > 1) {
+      var pd = document.createElement('button');
+      pd.className = 'mini ancho' + (x.predeterminada ? ' hecho' : '');
+      pd.textContent = x.predeterminada ? '✓ El atajo usa esta' : 'Que el atajo use esta';
+      pd.addEventListener('click', function () {
+        pd.disabled = true;
+        llamar('tarjetadefecto', { fila: x.fila, sello_nombre: x.nombre }, function (r) {
+          if (r && r.ok && r.estado) { pintar(r.estado); pintaListaTarjetas(); }
+          else { pd.disabled = false; alert((r && r.mensaje) || 'No se pudo.'); }
+        }, function () { pd.disabled = false; alert(FALTA_API ? SIN_API : SIN_RED); });
+      });
+      caja.appendChild(pd);
+    }
+    l.appendChild(caja);
+  });
+}
+
+$('nuevaTarjeta').addEventListener('click', function () { abreTarjeta(null); });
+
+function abreTarjeta(x) {
+  TARJETA_EDITA_FILA = x ? x.fila : null;
+  TARJETA_EDITA_NOMBRE = x ? x.nombre : '';
+  $('tituloTarjeta').textContent = x ? 'Cambiarle el nombre' : 'Nueva tarjeta';
+  $('tarjetaNombre').value = x ? x.nombre : '';
+  $('errTarjeta').style.display = 'none';
+  $('dlgTarjeta').showModal();
+}
+$('cerrarTarjeta').addEventListener('click', function () { $('dlgTarjeta').close(); });
+$('dlgTarjeta').addEventListener('click', function (ev) { if (ev.target === this) this.close(); });
+
+$('guardarTarjeta').addEventListener('click', function () {
+  var n = $('tarjetaNombre').value.trim();
+  if (!n) { $('errTarjeta').textContent = 'Ponle un nombre.'; $('errTarjeta').style.display = 'block'; return; }
+  var b = $('guardarTarjeta');
+  b.disabled = true; b.textContent = 'Guardando…';
+  var datos = { nombre: n };
+  if (TARJETA_EDITA_FILA) { datos.fila = TARJETA_EDITA_FILA; datos.sello_nombre = TARJETA_EDITA_NOMBRE; }
+  llamar('tarjetaguardar', datos, function (r) {
+    b.disabled = false; b.textContent = 'Guardar';
+    if (!r || !r.ok) {
+      $('errTarjeta').textContent = (r && r.mensaje) || 'No se pudo.';
+      $('errTarjeta').style.display = 'block';
+      return;
+    }
+    $('dlgTarjeta').close();
+    if (r.estado) pintar(r.estado);
+    pintaListaTarjetas();
+  }, function () {
+    b.disabled = false; b.textContent = 'Guardar';
+    $('errTarjeta').textContent = FALTA_API ? SIN_API : SIN_RED;
+    $('errTarjeta').style.display = 'block';
+  });
+});
+
+/* ---------- gastos fijos ---------- */
+var FIJO_EDITA = null, FIJO_MET = 'Tarjeta', FIJO_CAT = '', FIJO_TAR = 'Débito';
+
+// La tarjeta de la pestaña Mes: qué ya cayó y qué falta.
+function pintaFijosMes(f) {
+  var caja = $('tarjetaFijos'), l = $('listaFijosMes');
+  var activos = (f && f.lista ? f.lista : []).filter(function (x) { return x.activo; });
+  if (!activos.length) { caja.style.display = 'none'; return; }
+  caja.style.display = '';
+  l.innerHTML = '';
+
+  activos.forEach(function (x) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div>';
+    d.querySelector('.bolita').style.background = x.yaCayo ? css('--c-in') : colorCat(x.categoria);
+    if (!x.yaCayo) d.querySelector('.bolita').style.opacity = '.45';
+    d.querySelector('.c').textContent = x.nombre;
+    d.querySelector('.m').textContent = x.yaCayo ? 'Ya cayó este mes'
+      : (x.vencido ? 'Caía el ' + x.dia + ' · todavía no lo registras' : 'Cae el ' + x.dia);
+    if (x.vencido) d.querySelector('.m').style.color = css('--warn');
+    d.querySelector('.mto').textContent = pesos(x.monto);
+    if (!x.yaCayo) {
+      var b = document.createElement('button');
+      b.className = 'mini'; b.textContent = 'Registrar';
+      b.addEventListener('click', function () { registraFijo(x, b); });
+      d.appendChild(b);
+    }
+    l.appendChild(d);
+  });
+
+  $('fijoFalta').textContent = pesos(f.comprometido);
+  $('fijoCayo').textContent = pesos(f.pagado);
+}
+
+// Registrarlo es un gasto normal con los datos del fijo. El servidor no
+// sabe que viene de aquí, y así no hay dos caminos que mantener.
+function registraFijo(x, boton) {
+  boton.disabled = true; boton.textContent = 'Registrando…';
+  llamar('gasto', {
+    concepto: x.nombre, monto: x.monto,
+    metodo: x.metodo || 'Tarjeta', categoria: x.categoria, tarjeta: x.tarjeta || ''
+  }, function (r) {
+    if (r && r.estado) { pintar(r.estado); return; }
+    boton.disabled = false; boton.textContent = 'Registrar';
+  }, function () {
+    boton.disabled = false; boton.textContent = 'Registrar';
+  });
+}
+
+/* ---------- administrarlos ---------- */
+$('abrirFijos').addEventListener('click', function () {
+  $('dlgCfg').close();
+  pintaListaFijos();
+  $('dlgFijos').showModal();
+});
+$('cerrarFijos').addEventListener('click', function () { $('dlgFijos').close(); });
+$('dlgFijos').addEventListener('click', function (ev) { if (ev.target === this) this.close(); });
+
+function pintaListaFijos() {
+  var l = $('listaFijos');
+  l.innerHTML = '';
+  var lista = (E && E.fijos && E.fijos.lista) ? E.fijos.lista : [];
+  if (!lista.length) {
+    l.innerHTML = '<div class="vacio">Todavía no tienes gastos fijos.</div>';
+    return;
+  }
+  lista.forEach(function (x) {
+    var d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
+                  '<div class="mto num"></div><button class="borrar" title="Eliminar">&times;</button>';
+    d.querySelector('.bolita').style.background = colorCat(x.categoria);
+    d.querySelector('.bolita').style.opacity = x.activo ? '1' : '.3';
+    d.querySelector('.c').textContent = x.nombre;
+    d.querySelector('.c').style.opacity = x.activo ? '1' : '.5';
+    d.querySelector('.m').textContent = 'Cae el ' + x.dia + ' · ' + x.categoria +
+                                        (x.tarjeta ? ' · ' + x.tarjeta : '') +
+                                        (x.activo ? '' : ' · en pausa');
+    d.querySelector('.mto').textContent = pesos(x.monto);
+
+    var zona = d.querySelector('.txt');
+    zona.style.cursor = 'pointer';
+    zona.addEventListener('click', function () { abreFijo(x); });
+
+    var p = document.createElement('button');
+    p.className = 'mini' + (x.activo ? '' : ' hecho');
+    p.textContent = x.activo ? 'Pausar' : 'Reactivar';
+    p.addEventListener('click', function () {
+      p.disabled = true;
+      llamar('fijopausa', { fila: x.fila, activo: !x.activo }, function (r) {
+        if (r && r.estado) { pintar(r.estado); pintaListaFijos(); }
+        else p.disabled = false;
+      }, function () { p.disabled = false; });
+    });
+    d.insertBefore(p, d.querySelector('.borrar'));
+
+    d.querySelector('.borrar').addEventListener('click', function () {
+      if (!confirm('¿Eliminar "' + x.nombre + '" de tus gastos fijos?\n\nLos movimientos que ya registraste no se tocan.')) return;
+      llamar('fijoborrar', { fila: x.fila }, function (r) {
+        if (r && r.estado) { pintar(r.estado); pintaListaFijos(); }
+      });
+    });
+    l.appendChild(d);
+  });
+}
+
+$('nuevoFijo').addEventListener('click', function () { abreFijo(null); });
+
+function abreFijo(x) {
+  FIJO_EDITA = x;
+  $('tituloFijo').textContent = x ? 'Editar gasto fijo' : 'Nuevo gasto fijo';
+  $('fijoNombre').value = x ? x.nombre : '';
+  $('fijoMonto').value = x ? x.monto : '';
+  $('fijoDia').value = x ? x.dia : '';
+  FIJO_MET = (x && x.metodo) || 'Tarjeta';
+  FIJO_CAT = (x && x.categoria) || ((E && E.categorias) ? E.categorias[0] : '');
+  /* Un fijo que viene de antes de las tarjetas no dice con cuál se paga. Eso
+     NO es "débito": es que no se sabe. Se deja en blanco, no se elige nada, y
+     al guardar no se manda el campo, así que el servidor no lo toca. */
+  FIJO_TAR = x ? (x.tarjeta || '') : 'Débito';
+  chipsFijo();
+  $('errFijo').style.display = 'none';
+  $('dlgFijo').showModal();
+}
+
+function chipsFijo() {
+  var cm = $('fijoMetodo'); cm.innerHTML = '';
+  ['Tarjeta', 'Efectivo'].forEach(function (m) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (FIJO_MET === m ? ' on' : '');
+    b.type = 'button'; b.textContent = m;
+    b.addEventListener('click', function () { FIJO_MET = m; chipsFijo(); });
+    cm.appendChild(b);
+  });
+
+  // Una suscripción se cobra siempre a la misma tarjeta: queda guardada aquí
+  // para que al registrarla con un toque el saldo se mueva solo.
+  var conTarjeta = FIJO_MET === 'Tarjeta';
+  $('campoFijoTarjeta').style.display = conTarjeta ? '' : 'none';
+  if (conTarjeta) {
+    var nombres = ['Débito'].concat(misTarjetas().map(function (t) { return t.nombre; }));
+    // Si el fijo trae una tarjeta que ya no está en la lista, se muestra
+    // igual: si no, entrar a cambiarle el monto se la cambiaría a Débito sin
+    // avisar y el dato se perdería.
+    if (FIJO_TAR && nombres.indexOf(FIJO_TAR) < 0) nombres.push(FIJO_TAR);
+    var ctj = $('fijoTarjeta'); ctj.innerHTML = '';
+    nombres.forEach(function (n) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (FIJO_TAR === n ? ' on' : '');
+      b.type = 'button'; b.textContent = n;
+      b.addEventListener('click', function () { FIJO_TAR = n; chipsFijo(); });
+      ctj.appendChild(b);
+    });
+  }
+
+  var cc = $('fijoCat'); cc.innerHTML = '';
+  ((E && E.categorias) || []).forEach(function (c) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (FIJO_CAT === c ? ' on' : '');
+    b.type = 'button';
+    var p = document.createElement('span');
+    p.className = 'punto'; p.style.background = colorCat(c);
+    b.appendChild(p);
+    b.appendChild(document.createTextNode(c));
+    b.addEventListener('click', function () { FIJO_CAT = c; chipsFijo(); });
+    cc.appendChild(b);
+  });
+}
+
+$('cerrarFijo').addEventListener('click', function () { $('dlgFijo').close(); });
+$('dlgFijo').addEventListener('click', function (ev) { if (ev.target === this) this.close(); });
+
+$('guardarFijo').addEventListener('click', function () {
+  var b = $('guardarFijo');
+  b.disabled = true; b.textContent = 'Guardando…';
+  var datos = {
+    nombre: $('fijoNombre').value, monto: $('fijoMonto').value,
+    dia: $('fijoDia').value, metodo: FIJO_MET, categoria: FIJO_CAT
+  };
+  // Sin elegir nada no se manda el campo: así no se borra lo que ya tenía.
+  if (FIJO_MET !== 'Tarjeta') datos.tarjeta = '';
+  else if (FIJO_TAR) datos.tarjeta = FIJO_TAR;
+  if (FIJO_EDITA) datos.fila = FIJO_EDITA.fila;
+  llamar('fijoguardar', datos, function (r) {
+    b.disabled = false; b.textContent = 'Guardar';
+    if (!r || !r.ok) {
+      $('errFijo').textContent = (r && r.mensaje) || 'No se pudo.';
+      $('errFijo').style.display = 'block';
+      return;
+    }
+    $('dlgFijo').close();
+    if (r.estado) pintar(r.estado);
+    pintaListaFijos();
+  }, function () {
+    b.disabled = false; b.textContent = 'Guardar';
+    $('errFijo').textContent = FALTA_API ? SIN_API : SIN_RED;
+    $('errFijo').style.display = 'block';
+  });
+});
+
 /* ---------- corregir la fecha de un movimiento ---------- */
 var ENEDICION = null;
 
@@ -1339,6 +1915,10 @@ function diaLeible(iso) {
   return Number(p[2]) + ' de ' + MESES_TXT[Number(p[1]) - 1] + ' de ' + p[0];
 }
 
+/* Con qué tarjeta quedó el movimiento que se está corrigiendo. Null cuando no
+   se pagó con tarjeta: ahí el renglón ni aparece. */
+var TARJETA_EDITA = null;
+
 function abreFecha(m) {
   ENEDICION = m;
   $('fechaQue').textContent = m.concepto + ' · ' + pesos(m.monto) + ' · hoy está en el ' + m.cuando;
@@ -1346,15 +1926,49 @@ function abreFecha(m) {
   i.value = m.iso || '';
   i.max = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   $('fechaLeible').textContent = diaLeible(i.value);
+
+  // La tarjeta solo se corrige en un gasto pagado con tarjeta.
+  var conTarjeta = m.tipo !== 'Ingreso' && String(m.metodo || '').toLowerCase().indexOf('tarj') === 0;
+  $('tituloCorregir').textContent = conTarjeta ? 'Corregir' : 'Corregir la fecha';
+  $('campoCorrigeTarjeta').style.display = conTarjeta ? '' : 'none';
+  TARJETA_EDITA = conTarjeta ? (m.tarjeta || '') : null;
+  if (conTarjeta) chipsCorrige();
+
   $('guardarFecha').disabled = true;     // nada que guardar hasta que cambie
   $('errFecha').style.display = 'none';
   $('dlgFecha').showModal();
 }
 
-// Mientras no elija otro día, Guardar no hace nada y se ve apagado.
+function chipsCorrige() {
+  var nombres = ['Débito'].concat(misTarjetas().map(function (t) { return t.nombre; }));
+  // Si el movimiento trae una tarjeta que ya no está en la lista (la quitaste,
+  // o el atajo mandó un nombre que no reconoces), igual se muestra: si no,
+  // elegir cualquier otra la borraría sin que se viera qué decía antes.
+  if (TARJETA_EDITA && nombres.indexOf(TARJETA_EDITA) < 0) nombres.push(TARJETA_EDITA);
+  var c = $('chipsCorrigeTarjeta'); c.innerHTML = '';
+  nombres.forEach(function (n) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (TARJETA_EDITA === n ? ' on' : '');
+    b.type = 'button'; b.textContent = n;
+    b.addEventListener('click', function () {
+      TARJETA_EDITA = n; chipsCorrige(); revisaCorregir();
+    });
+    c.appendChild(b);
+  });
+}
+
+// Guardar se prende en cuanto algo sea distinto de como estaba.
+function revisaCorregir() {
+  if (!ENEDICION) { $('guardarFecha').disabled = true; return; }
+  var v = $('fechaNueva').value;
+  var cambioFecha = !!v && v !== ENEDICION.iso;
+  var cambioTarjeta = TARJETA_EDITA !== null && TARJETA_EDITA !== (ENEDICION.tarjeta || '');
+  $('guardarFecha').disabled = !(cambioFecha || cambioTarjeta);
+}
+
 $('fechaNueva').addEventListener('change', function () {
   $('fechaLeible').textContent = diaLeible(this.value);
-  $('guardarFecha').disabled = !this.value || !ENEDICION || this.value === ENEDICION.iso;
+  revisaCorregir();
 });
 
 $('cerrarFecha').addEventListener('click', function () { $('dlgFecha').close(); });
@@ -1368,10 +1982,23 @@ $('guardarFecha').addEventListener('click', function () {
   if (!ENEDICION) return;
   var v = $('fechaNueva').value;
   if (!v) { $('errFecha').textContent = 'Elige una fecha.'; $('errFecha').style.display = 'block'; return; }
-  if (v === ENEDICION.iso) { $('dlgFecha').close(); return; }
+
+  var datos = { fila: ENEDICION.fila,
+                sello_concepto: ENEDICION.concepto, sello_monto: ENEDICION.monto };
+  // Solo se manda lo que de verdad cambió: así el servidor no reescribe
+  // columnas por gusto ni se arriesga a tocar lo que ya estaba bien.
+  if (v !== ENEDICION.iso) datos.fecha = v;
+  if (TARJETA_EDITA !== null && TARJETA_EDITA !== (ENEDICION.tarjeta || '')) datos.tarjeta = TARJETA_EDITA;
+  if (datos.fecha === undefined && datos.tarjeta === undefined) { $('dlgFecha').close(); return; }
+
+  /* Si solo cambió la fecha se manda con el nombre viejo de la acción. El
+     servidor nuevo entiende los dos; el viejo solo "fecha". Así, mientras no
+     se haya subido el .gs, corregir fechas sigue funcionando. */
+  var accion = datos.tarjeta === undefined ? 'fecha' : 'corregir';
+
   var b = $('guardarFecha');
   b.disabled = true; b.textContent = 'Guardando…';
-  llamar('fecha', { fila: ENEDICION.fila, fecha: v, sello_concepto: ENEDICION.concepto, sello_monto: ENEDICION.monto }, function (r) {
+  llamar(accion, datos, function (r) {
     b.textContent = 'Guardar';
     if (!r || !r.ok) {
       b.disabled = false;
