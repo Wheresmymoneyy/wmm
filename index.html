@@ -166,7 +166,10 @@
   .lista .txt { flex:1; min-width:0; }
   .lista .txt .c { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .lista .txt .m { font-size:12.5px; color:var(--muted); }
-  .lista .mto { font-size:15px; font-weight:700; }
+  .lista .mto { font-size:15px; font-weight:700; text-align:right; }
+  /* Lo que llevas del periodo que no ha cerrado: debajo del monto, chiquito.
+     Como frase ocupaba dos renglones; como número, cabe de sobra. */
+  .lista .mto .prox { display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-top:1px; }
   .lista .mto.ing { color:var(--c-in); }
   .lista .borrar { background:none; border:0; color:var(--muted); font-size:19px; padding:2px 4px; cursor:pointer; line-height:1; }
 
@@ -497,7 +500,7 @@
     <div class="tarjeta" id="tarjetaCredito" style="display:none">
       <div class="titulo-sec">Por pagar de tus tarjetas</div>
       <div class="lista" id="listaCreditoMes"></div>
-      <p class="pista" style="margin:12px 0 0">Es todo lo que has gastado con cada tarjeta menos lo que ya pagaste. Cuando pagues, dale <b>Ya la pagué</b> y vuelve a cero.</p>
+      <p class="pista" id="pieCredito" style="margin:12px 0 0"></p>
     </div>
 
     <div class="tarjeta">
@@ -615,7 +618,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 19 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 20 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -654,8 +657,9 @@
 <dialog id="dlgTarjetas">
   <div class="cuerpo" tabindex="-1" autofocus>
     <h2>Mis tarjetas</h2>
-    <p class="pista">Solo las de crédito, que son las que dejan deuda. El débito no hace falta: ya es una opción al registrar.</p>
-    <p class="pista" id="pistaDefecto" style="display:none">Cuando registras desde el atajo solo dices <b>crédito</b>, sin decir cuál. Marca aquí la que usas a diario y el atajo la va a asumir; las demás se eligen a mano en la app.</p>
+    <p class="pista">Solo las de crédito. El débito ya es una opción al registrar.</p>
+    <p class="pista" id="pistaDefecto" style="display:none">El atajo solo pregunta "crédito", sin decir cuál. Marca la que usas a diario.</p>
+    <p class="pista">Aquí sale todo lo que debes. En Mes, solo lo que ya cerró.</p>
     <div class="lista" id="listaTarjetas"></div>
     <button class="chico pri" id="nuevaTarjeta" style="margin-top:14px">Agregar una tarjeta</button>
     <div class="fila-btn">
@@ -671,7 +675,22 @@
       <label for="tarjetaNombre">¿Cómo le dices?</label>
       <input type="text" id="tarjetaNombre" placeholder="BBVA Oro, Amex, Nu…" autocomplete="off">
     </div>
-    <p class="pista">Ponle el nombre con el que la reconozcas de un vistazo. No guardes el número: aquí no hace falta y no debe andar escrito.</p>
+    <p class="pista">No guardes el número de la tarjeta: aquí no hace falta.</p>
+    <div class="campo">
+      <label>¿Cuál te cae siempre el mismo día del mes?</label>
+      <div class="chips" id="tarjetaAncla"></div>
+    </div>
+    <div class="dosdatos" style="gap:10px;margin-bottom:4px">
+      <div class="campo">
+        <label for="tarjetaDiaFijo" id="lblDiaFijo">Día de corte</label>
+        <input type="number" id="tarjetaDiaFijo" inputmode="numeric" min="1" max="31" placeholder="—">
+      </div>
+      <div class="campo">
+        <label for="tarjetaDias" id="lblDias">Días hasta el pago</label>
+        <input type="number" id="tarjetaDias" inputmode="numeric" min="1" max="60" placeholder="—">
+      </div>
+    </div>
+    <p class="pista" id="pistaCiclo"></p>
     <div id="errTarjeta" class="aviso mal" style="display:none;margin-bottom:12px"></div>
     <div class="fila-btn">
       <button id="cerrarTarjeta">Cancelar</button>
@@ -1527,12 +1546,34 @@ function pintaLista(l, movs) {
    menos todo lo pagado, así que NO se puede decir "N gastos sin pagar" —no
    se sabe cuáles de los gastos cubrió cada pago, y además con un pago
    parcial la frase mentiría. */
+/* Qué se dice debajo del nombre de la tarjeta, y de qué color.
+
+   Con día de corte hay DOS números: lo cerrado (lo que el banco ya te va a
+   cobrar) y lo que llevas del periodo nuevo. El grande es lo cerrado, porque
+   es lo único que tienes que pagar; lo otro va aquí abajo, en gris, para que
+   no se te olvide que viene. Sin día de corte, todo es exigible y se
+   comporta como siempre. */
+/* Si el servidor todavía es el viejo no manda "cerrado", y sin esto la
+   tarjeta salía en $0, apagada y sin botón de pagar: una deuda de miles
+   desaparecía de la pantalla mientras suben los dos archivos. */
+function loQueDebe(x) { return x.cerrado === undefined ? (x.saldo || 0) : x.cerrado; }
+
 function saldoEnPalabras(x) {
-  if (x.saldo < 0) return 'Pagaste de más · tienes ' + pesos(Math.abs(x.saldo)) + ' a favor';
-  if (x.saldo === 0) return x.ultimoPago ? 'Al corriente · pagaste el ' + x.ultimoPago.cuando
-                                         : 'Sin gastos todavía';
-  return 'Por pagar';   // corto a propósito: con tres renglones la tarjeta se desarma
+  var c = x.corto, cerrado = loQueDebe(x);
+  if (cerrado < 0)   return { texto: pesos(Math.abs(cerrado)) + ' a favor', color: '' };
+  if (cerrado === 0) return { texto: (x.saldo || x.ultimoPago) ? 'Al corriente' : 'Sin gastos', color: '' };
+  if (c && c.vence) {
+    if (c.diasParaPagar < 0)   return { texto: 'Se venció el ' + c.vence, color: 'danger' };
+    if (c.diasParaPagar === 0) return { texto: 'Vence hoy', color: 'danger' };
+    if (c.diasParaPagar <= 5)  return { texto: 'Vence en ' + c.diasParaPagar +
+                                   (c.diasParaPagar === 1 ? ' día' : ' días'), color: 'warn' };
+    return { texto: 'Paga el ' + c.vence, color: '' };
+  }
+  if (c) return { texto: 'Cerró el ' + c.cerro, color: '' };
+  return { texto: 'Por pagar', color: '' };
 }
+
+function saldoCorto(x) { return saldoEnPalabras(x).texto; }
 
 // La tarjeta de Mes: cuánto debes de cada una y el botón para saldarla.
 function pintaCreditoMes(t) {
@@ -1551,16 +1592,30 @@ function pintaCreditoMes(t) {
     d.className = 'item';
     d.innerHTML = '<span class="bolita"></span><div class="txt"><div class="c"></div><div class="m"></div></div>' +
                   '<div class="mto num"></div>';
-    d.querySelector('.bolita').style.background = x.saldo > 0 ? css('--c-out') : css('--c-in');
-    if (!x.saldo) d.querySelector('.bolita').style.opacity = '.45';
+    var color = saldoEnPalabras(x).color;
+    var cerrado = loQueDebe(x);
+    d.querySelector('.bolita').style.background =
+      color === 'danger' ? css('--danger') : (cerrado > 0 ? css('--c-out') : css('--c-in'));
+    if (!cerrado) d.querySelector('.bolita').style.opacity = '.45';
     d.querySelector('.c').textContent = x.nombre;
-    d.querySelector('.m').textContent = saldoEnPalabras(x);
-    d.querySelector('.mto').textContent = pesos(x.saldo);
-    if (x.saldo > 0) {
+    d.querySelector('.m').textContent = saldoCorto(x);
+    if (color) d.querySelector('.m').style.color = css(color === 'danger' ? '--danger' : '--warn');
+    var mto = d.querySelector('.mto');
+    mto.textContent = pesos(cerrado);
+    if (x.enCurso > 0) {
+      var pr = document.createElement('span');
+      pr.className = 'prox';
+      pr.textContent = '+' + pesos(x.enCurso);
+      pr.title = 'Va para tu próximo corte';
+      mto.appendChild(pr);
+    }
+    if (cerrado > 0) {
       var b = document.createElement('button');
       b.className = 'mini'; b.textContent = 'Ya la pagué';
       b.addEventListener('click', function () {
-        if (!confirm('¿Ya pagaste ' + pesos(x.saldo) + ' de ' + x.nombre + '?\n\nQueda en ceros y se guarda el pago. Lo que gastes después se vuelve a sumar.')) return;
+        if (!confirm('¿Ya pagaste ' + pesos(cerrado) + ' de ' + x.nombre + '?' +
+            (x.enCurso > 0 ? '\n\nEs lo que se cerró en tu último corte. Los ' + pesos(x.enCurso) +
+             ' que llevas del periodo nuevo se quedan para la próxima.' : '\n\nQueda en ceros y se guarda el pago.'))) return;
         b.disabled = true; b.textContent = 'Un momento…';
         llamar('tarjetapago', { fila: x.fila, sello_nombre: x.nombre }, function (r) {
           if (r && r.ok && r.estado) { pintar(r.estado); return; }
@@ -1578,10 +1633,18 @@ function pintaCreditoMes(t) {
     l.appendChild(d);
   });
 
+  /* Lo que llevas del periodo que no ha cerrado va UNA vez al pie, no
+     repetido en cada renglón: ahí el texto se comía cuatro líneas. */
+  var curso = 0;
+  lista.forEach(function (x) { curso += x.enCurso || 0; });
+  $('pieCredito').textContent = curso > 0
+    ? 'El número grande es lo que ya cerró; el chiquito, lo que llevas para el próximo corte.'
+    : 'Aquí solo sale lo que ya cerró en tu corte.';
+
   /* Lo gastado a crédito que todavía no sabe de cuál tarjeta fue. Va aparte,
-     sin botón de pagar: primero hay que decir con cuál fue. */
-  // Se enseña si hay movimientos pendientes, aunque la suma dé cero: lo que
-  // hay que resolver es que falta decir con cuál tarjeta fueron.
+     sin botón de pagar: primero hay que decir con cuál fue.
+     Se enseña si hay movimientos pendientes, aunque la suma dé cero: lo que
+     hay que resolver es que falta decir con cuál tarjeta fueron. */
   if (sin || (t && t.movimientosSinAsignar)) {
     var d = document.createElement('div');
     d.className = 'item';
@@ -1590,8 +1653,7 @@ function pintaCreditoMes(t) {
     d.querySelector('.bolita').style.background = css('--warn');
     d.querySelector('.c').textContent = 'Sin asignar';
     d.querySelector('.m').textContent = t.movimientosSinAsignar === 1
-      ? '1 gasto a crédito · tócalo en Movs para decir con cuál fue'
-      : t.movimientosSinAsignar + ' gastos a crédito · tócalos en Movs para decir con cuál fueron';
+      ? 'Dile en Movs con cuál tarjeta fue' : 'Dile en Movs con cuáles tarjetas fueron';
     d.querySelector('.m').style.color = css('--warn');
     d.querySelector('.mto').textContent = pesos(sin);
     l.appendChild(d);
@@ -1599,7 +1661,33 @@ function pintaCreditoMes(t) {
 }
 
 /* ---------- administrarlas ---------- */
-var TARJETA_EDITA_FILA = null, TARJETA_EDITA_NOMBRE = '';
+var TARJETA_EDITA_FILA = null, TARJETA_EDITA_NOMBRE = '', TARJETA_ANCLA = 'corte';
+
+/* Dos maneras de armar el ciclo, y los bancos usan las dos:
+   - el corte es siempre el mismo día y el pago viene después (Plata);
+   - el PAGO es siempre el mismo día y el corte va N días antes, así que el
+     corte se mueve solo mes con mes (Nu: paga el 8, corta 10 días antes,
+     o sea el 29 de octubre pero el 28 de noviembre).
+   Tratar las dos como día fijo deja mal a una de las dos. */
+function chipsAncla() {
+  var c = $('tarjetaAncla'); c.innerHTML = '';
+  [['corte', 'El corte'], ['pago', 'El pago']].forEach(function (o) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (TARJETA_ANCLA === o[0] ? ' on' : '');
+    b.type = 'button'; b.textContent = o[1];
+    b.addEventListener('click', function () { TARJETA_ANCLA = o[0]; chipsAncla(); });
+    c.appendChild(b);
+  });
+  var porPago = TARJETA_ANCLA === 'pago';
+  $('lblDiaFijo').textContent = porPago ? 'Día de pago' : 'Día de corte';
+  // Cortas, o se parten en dos renglones y la ventana se ve apretada.
+  $('lblDias').textContent = porPago ? 'Días antes' : 'Días después';
+  // Sin nombres de banco: cada quien tiene el suyo.
+  $('pistaCiclo').textContent = (porPago
+    ? 'Pagas el mismo día cada mes y el corte cae esos días antes.'
+    : 'Cortas el mismo día cada mes y pagas esos días después.') +
+    ' Vienen en tu estado de cuenta.';
+}
 
 $('abrirTarjetas').addEventListener('click', function () {
   $('dlgCfg').close();
@@ -1629,7 +1717,11 @@ function pintaListaTarjetas() {
     d.querySelector('.bolita').style.background = x.saldo > 0 ? css('--c-out') : css('--c-in');
     if (!x.saldo) d.querySelector('.bolita').style.opacity = '.45';
     d.querySelector('.c').textContent = x.nombre;
-    d.querySelector('.m').textContent = x.saldo > 0 ? 'Por pagar' : 'Al corriente';
+    d.querySelector('.m').textContent = !x.diaFijo ? 'Sin fecha de corte'
+      : (x.ancla === 'pago'
+          ? 'Pagas el ' + x.diaFijo + ' · corta ' + x.dias + ' días antes'
+          : 'Corte el ' + x.diaFijo + (x.dias ? ' · pagas ' + x.dias + ' días después' : ''));
+    if (!x.diaFijo) d.querySelector('.m').style.color = css('--warn');
     d.querySelector('.mto').textContent = pesos(x.saldo);
 
     var zona = d.querySelector('.txt');
@@ -1669,8 +1761,12 @@ $('nuevaTarjeta').addEventListener('click', function () { abreTarjeta(null); });
 function abreTarjeta(x) {
   TARJETA_EDITA_FILA = x ? x.fila : null;
   TARJETA_EDITA_NOMBRE = x ? x.nombre : '';
-  $('tituloTarjeta').textContent = x ? 'Cambiarle el nombre' : 'Nueva tarjeta';
+  $('tituloTarjeta').textContent = x ? 'Editar tarjeta' : 'Nueva tarjeta';
   $('tarjetaNombre').value = x ? x.nombre : '';
+  $('tarjetaDiaFijo').value = (x && x.diaFijo) ? x.diaFijo : '';
+  $('tarjetaDias').value = (x && x.dias) ? x.dias : '';
+  TARJETA_ANCLA = (x && x.ancla) || 'corte';
+  chipsAncla();
   $('errTarjeta').style.display = 'none';
   $('dlgTarjeta').showModal();
 }
@@ -1682,7 +1778,9 @@ $('guardarTarjeta').addEventListener('click', function () {
   if (!n) { $('errTarjeta').textContent = 'Ponle un nombre.'; $('errTarjeta').style.display = 'block'; return; }
   var b = $('guardarTarjeta');
   b.disabled = true; b.textContent = 'Guardando…';
-  var datos = { nombre: n };
+  var datos = { nombre: n, ancla: TARJETA_ANCLA,
+                diaFijo: $('tarjetaDiaFijo').value.trim(),
+                dias: $('tarjetaDias').value.trim() };
   if (TARJETA_EDITA_FILA) { datos.fila = TARJETA_EDITA_FILA; datos.sello_nombre = TARJETA_EDITA_NOMBRE; }
   llamar('tarjetaguardar', datos, function (r) {
     b.disabled = false; b.textContent = 'Guardar';
