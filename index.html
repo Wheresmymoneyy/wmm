@@ -166,6 +166,16 @@
   .lista .txt { flex:1; min-width:0; }
   .lista .txt .c { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .lista .txt .m { font-size:12.5px; color:var(--muted); }
+  /* El aviso de "esto es de hace rato". Va fuera del scroller, pegado al
+     encabezado, para que no se pierda al bajar por la pantalla. */
+  #avisoViejo {
+    display:none; background:var(--warn-soft); color:var(--warn);
+    border-bottom:1px solid var(--line);
+    padding:9px 16px; font-size:13px; font-weight:600; text-align:center;
+    padding-left:calc(16px + env(safe-area-inset-left));
+    padding-right:calc(16px + env(safe-area-inset-right));
+  }
+  #avisoViejo.sale { display:block; }
   .lista .mto { font-size:15px; font-weight:700; text-align:right; }
   /* Lo que llevas del periodo que no ha cerrado: debajo del monto, chiquito.
      Como frase ocupaba dos renglones; como número, cabe de sobra. */
@@ -419,6 +429,8 @@
     <button class="btn-cfg" id="abrirCfg">Ajustes</button>
   </header>
 
+  <div id="avisoViejo" role="status"></div>
+
   <main id="lienzo">
 
   <!-- ============ REGISTRAR ============ -->
@@ -618,7 +630,7 @@
       <div class="titulo-sec">Tu cuenta</div>
       <p style="margin:0 0 6px;font-size:15px">Estás dentro como <strong id="quienSoy">—</strong>.</p>
       <p style="margin:0;font-size:13px;color:var(--muted)">Para compartir la app, manda el enlace de arriba. Cada persona crea su usuario y sus números quedan separados de los tuyos.</p>
-      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 20 · <span id="medidas">—</span></p>
+      <p style="margin:14px 0 0;font-size:11.5px;color:var(--muted)">Versión 21 · <span id="medidas">—</span></p>
     </div>
   </section>
   </main>
@@ -835,6 +847,55 @@ function pesosCorto(n) {
   return '$' + Math.round(n);
 }
 
+/* ---------- la copia para cuando no hay internet ----------
+   Guarda el último estado que sí llegó del servidor, con la hora. Si
+   mañana abres la app en el metro, se pinta eso con un aviso de cuándo
+   es. Solo para MIRAR: registrar sigue necesitando señal.
+   Se borra al cerrar sesión, porque son tus números y el teléfono puede
+   acabar en otras manos. */
+var LLAVE_COPIA = 'gastos-ultimo';
+var VIENDO_VIEJO = false;
+
+function guardaCopia(estado) {
+  try {
+    localStorage.setItem(LLAVE_COPIA, JSON.stringify({ cuando: Date.now(), estado: estado }));
+  } catch (e) {
+    // Sin espacio o en modo privado: no pasa nada, solo no habrá copia.
+  }
+}
+
+function leeCopia() {
+  try {
+    var c = JSON.parse(localStorage.getItem(LLAVE_COPIA) || 'null');
+    return (c && c.estado && c.estado.ok) ? c : null;
+  } catch (e) { return null; }
+}
+
+function borraCopia() { try { localStorage.removeItem(LLAVE_COPIA); } catch (e) {} }
+
+// "hace un momento", "hace 3 horas", "ayer a las 9:40"…
+function haceCuanto(ms) {
+  var min = Math.round((Date.now() - ms) / 60000);
+  if (min < 2) return 'hace un momento';
+  if (min < 60) return 'hace ' + min + ' minutos';
+  var hrs = Math.round(min / 60);
+  if (hrs < 24) return 'hace ' + hrs + (hrs === 1 ? ' hora' : ' horas');
+  var d = new Date(ms);
+  var dias = Math.round(hrs / 24);
+  var hora = d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+  if (dias === 1) return 'ayer a las ' + hora;
+  return 'hace ' + dias + ' días';
+}
+
+function avisoViejo(cuando) {
+  VIENDO_VIEJO = cuando != null;
+  var a = $('avisoViejo');
+  if (!VIENDO_VIEJO) { a.classList.remove('sale'); a.textContent = ''; return; }
+  a.textContent = 'Sin conexión · lo que ves es de ' + haceCuanto(cuando);
+  a.classList.add('sale');
+  ajustarFondo();   // el aviso le quita alto al scroller
+}
+
 function guardaToken(t) { try { localStorage.setItem('gastos-token', t); } catch (e) {} }
 function leeToken() { try { return localStorage.getItem('gastos-token') || ''; } catch (e) { return ''; } }
 function borraToken() { try { localStorage.removeItem('gastos-token'); } catch (e) {} }
@@ -924,13 +985,13 @@ function error(t) {
   $('errClave').style.display = 'block';
 }
 
-function arrancar(estado) {
+function arrancar(estado, deLaCopia) {
   $('puerta').style.display = 'none';
   $('app').classList.add('listo');
   ajustarFondo();
   setTimeout(ajustarFondo, 400);
   USUARIO = estado.usuario || USUARIO;
-  pintar(estado);
+  pintar(estado, deLaCopia);
 }
 
 /* ============ navegación ============ */
@@ -950,7 +1011,7 @@ function ajustarFondo() {
   l.style.paddingBottom = Math.round(tapado + 24) + 'px';
   MEDIDAS = window.innerWidth + '\u00d7' + window.innerHeight + ' \u00b7 barra ' + Math.round(barra.bottom);
   var e = document.getElementById('medidas');
-  if (e) e.textContent = MEDIDAS;
+  if (e) e.textContent = MEDIDAS + ' \u00b7 ' + estadoSinRed();
 }
 ajustarFondo();
 window.addEventListener('load', ajustarFondo);
@@ -1143,12 +1204,16 @@ $('guardarLimite').addEventListener('click', function () {
 });
 $('salir').addEventListener('click', function () {
   borraToken();
+  borraCopia();     // son tus números: no se quedan en el teléfono
   location.reload();
 });
 
 /* ============ pintar todo ============ */
-function pintar(estado) {
+function pintar(estado, deLaCopia) {
   E = estado;
+  // Todo estado que llegó del servidor se guarda para la próxima vez que
+  // no haya señal. El que viene de la copia no se vuelve a guardar.
+  if (!deLaCopia) { guardaCopia(estado); avisoViejo(null); }
   var r = estado.resumen;
   $('fechaHoy').textContent = estado.hoy;
 
@@ -2281,7 +2346,11 @@ function dibujaHistoria(meses) {
     llamar('estado', {}, function (r) {
       if (r && r.ok) pintar(r);
       refrescando = false; descansar();
-    }, function () { refrescando = false; descansar(); });
+    }, function () {
+      // Sigue sin haber red: que no parezca que se actualizó.
+      refrescando = false; descansar();
+      if (VIENDO_VIEJO) { var c = leeCopia(); if (c) avisoViejo(c.cuando); }
+    });
   }
 
   function descansar() {
@@ -2290,6 +2359,34 @@ function dibujaHistoria(meses) {
     ind.classList.remove('suelta', 'girando');
   }
 })();
+
+/* Lo que dice la línea de abajo en Cuenta sobre el modo sin conexión. No
+   es un adorno: es la única forma de saber desde el propio teléfono si de
+   verdad quedó lista, porque Safari no se puede probar desde fuera. */
+function estadoSinRed() {
+  var hay = ('serviceWorker' in navigator);
+  if (!hay) return 'sin modo offline';
+  var manda = !!navigator.serviceWorker.controller;
+  var c = leeCopia();
+  if (!manda) return 'offline: preparando\u2026';
+  if (!c) return 'offline: falta cargar datos';
+  return 'offline listo \u00b7 datos de ' + haceCuanto(c.cuando);
+}
+
+/* ============ que la app abra sin internet ============
+   Registra sw.js, que guarda el armazón de la app en el teléfono. Si
+   falla —navegador viejo, modo privado, servidor sin https— no pasa
+   nada: la app sigue funcionando igual, solo que necesitando señal. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function () {
+      // Cuando toma el control, repintar la línea de Cuenta para que no se
+      // quede diciendo "preparando…" cuando ya está listo.
+      if (navigator.serviceWorker.controller) { ajustarFondo(); return; }
+      navigator.serviceWorker.addEventListener('controllerchange', ajustarFondo);
+    }).catch(function () {});
+  });
+}
 
 /* ============ inicio ============ */
 (function () {
@@ -2301,6 +2398,9 @@ function dibujaHistoria(meses) {
     if (r && r.ok) { arrancar(r); return; }
     borraToken(); location.reload();
   }, function () {
+    // No hubo red. Si hay copia guardada, se abre con ella y se avisa.
+    var c = leeCopia();
+    if (c) { arrancar(c.estado, true); avisoViejo(c.cuando); return; }
     $('puerta').innerHTML = '<div class="cargando">' + (FALTA_API ? SIN_API : 'No se pudo conectar.<br>Revisa tu internet y vuelve a abrir.') + '</div>';
   });
 })();
